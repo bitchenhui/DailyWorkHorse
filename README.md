@@ -6,6 +6,25 @@
 
 > 推送走 PushPlus 官方公众号；你自己的个人未认证公众号继续做内容经营，互不冲突。
 
+## 半自动发布到个人公众号
+
+Actions 每天同时生成并保存：
+
+- `index.html`：在线预览页，支持一键复制公众号正文
+- `article.html`：独立 HTML 成稿
+- `article.md`：备用 Markdown 成稿
+- `cover.png`：900×383 公众号头条封面，核心文字位于中央安全区
+
+你的发布流程：
+
+1. 从 PushPlus 打开最新成稿
+2. 点击 **复制公众号正文**，粘贴到公众号编辑器
+3. 下载并上传 `cover.png`
+4. 预览并群发
+
+Actions 的 `wechat-draft-*` Artifact 保存每期完整素材 30 天；GitHub Pages
+展示最新一期。
+
 ## 消息长什么样
 
 - 标题：`开源升温榜｜今日增长最快的 10 个 GitHub 项目`
@@ -45,11 +64,14 @@
 | `LLM_API_BASE` | API Base URL（不要末尾多余路径以外的 `/chat/completions`） |
 | `LLM_MODEL` | 模型名 |
 
-### 4. 打开 Actions
+### 4. 打开 Actions 与 Pages
 
-推送本仓库后，到 **Actions** 页启用工作流。可点 **Daily GitHub Trending WeChat → Run workflow** 手动试推一次（手动触发**不会** sleep 30 分钟）。
+1. 到 **Actions** 页启用工作流
+2. 到 **Settings → Pages → Build and deployment → Source** 选择
+   **GitHub Actions**
+3. 在 **Daily GitHub Trending WeChat** 中点 **Run workflow** 手动试跑
 
-定时：UTC `0 0 * * *` + sleep 1800 ≈ 北京时间 **08:30**（GitHub cron 可能有数分钟到几十分钟延迟，属正常现象）。
+定时：UTC `30 0 * * *`，即北京时间 **08:30**。GitHub 调度可能延迟数分钟。
 
 ## 本地试跑
 
@@ -68,13 +90,22 @@ $env:LLM_MODEL="deepseek-chat"
 python main.py
 ```
 
+只生成素材、不推送：
+
+```powershell
+python main.py --dry-run
+start dist\index.html
+```
+
 ## 文件说明
 
 ```
-main.py                      # 抓取 + LLM + 推送
+main.py                      # 抓取 + LLM + PushPlus
+publisher.py                 # 公众号成稿、复制页与封面生成
 requirements.txt
 .env.example
-.github/workflows/daily.yml  # 定时任务
+.github/workflows/daily.yml  # 定时、Artifact 与 Pages 部署
+tests/test_main.py
 ```
 
 ## 以后换成自己的服务号

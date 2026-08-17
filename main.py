@@ -18,6 +18,8 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
+from publisher import write_publish_bundle
+
 
 def _load_dotenv() -> None:
     """可选加载本地 .env（不覆盖已有环境变量）。"""
@@ -637,16 +639,34 @@ def main() -> int:
 
     title, content = build_message(repos, editorial)
 
-    preview = Path(__file__).resolve().parent / "preview.html"
-    preview.write_text(content, encoding="utf-8")
-    _safe_print(f"已写出本地预览: {preview}")
+    today = datetime.now(CST).strftime("%Y-%m-%d")
+    output_dir = Path(__file__).resolve().parent / "dist"
+    write_publish_bundle(
+        output_dir=output_dir,
+        title=title,
+        date_text=today,
+        article_html=content,
+        repos=repos,
+        editorial=editorial,
+    )
+    _safe_print(f"已生成公众号发布素材: {output_dir}")
 
     if dry_run:
         _safe_print("--dry-run：跳过微信推送")
         return 0
 
     _safe_print("推送到微信 …")
-    push_wechat(title, content)
+    draft_url = os.environ.get("PUBLIC_DRAFT_URL", "").strip()
+    push_content = content
+    if draft_url:
+        safe_url = _esc(draft_url, quote=True)
+        push_content += (
+            f'<div style="margin:18px 12px;padding:15px;border-radius:9px;'
+            f'background:{ACCENT_SOFT};font:600 14px/1.5 {FONT};text-align:center;">'
+            f'<a href="{safe_url}" style="color:{ACCENT};text-decoration:none;">'
+            "打开公众号成稿 · 复制正文 →</a></div>"
+        )
+    push_wechat(title, push_content)
     return 0
 
 
