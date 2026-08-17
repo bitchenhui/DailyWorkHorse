@@ -7,7 +7,8 @@ import json
 import os
 import re
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+import traceback
 from datetime import datetime, timezone, timedelta
 from html import escape as _esc
 from pathlib import Path
@@ -141,14 +142,34 @@ def merge_rank_repos(
     return top
 
 
-def _fetch_trending_page(url: str) -> list[dict[str, Any]]:
-    resp = requests.get(
-        url,
-        headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return _parse_trending_html(resp.text)
+def _fetch_trending_page(url: str, retries: int = 3) -> list[dict[str, Any]]:
+    last_error: Exception | None = None
+    for attempt in range(retries):
+        try:
+            resp = requests.get(
+                url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Cache-Control": "no-cache",
+                },
+                timeout=30,
+            )
+            if resp.status_code in {429, 502, 503}:
+                raise requests.HTTPError(f"HTTP {resp.status_code}", response=resp)
+            resp.raise_for_status()
+            repos = _parse_trending_html(resp.text)
+            if repos:
+                return repos
+            # 空结果常见于被拦截的登录墙页，重试一次
+            last_error = RuntimeError("页面未解析出仓库卡片")
+        except (requests.RequestException, RuntimeError) as exc:
+            last_error = exc
+        time.sleep(1.2 * (attempt + 1))
+    if last_error:
+        raise last_error
+    return []
 
 
 def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
@@ -156,6 +177,8 @@ def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
 
     GitHub 综合 Trending 有时少于 10 条。语言榜用于扩大候选池，不改变
     排序口径；最终仍统一按各卡片的 ``stars today`` 数值排名。
+
+    Actions 环境对 github.com 并发更敏感，改为串行抓取并容忍部分失败。
     """
     urls = [TRENDING_URL] + [
         f"https://github.com/trending/{language}?since=daily"
@@ -163,18 +186,24 @@ def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
     ]
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_fetch_trending_page, url): url for url in urls}
-        for future in as_completed(futures):
-            try:
-                candidates.extend(future.result())
-            except requests.RequestException as exc:
-                errors.append(f"{futures[future]}: {exc}")
+    for url in urls:
+        try:
+            page_repos = _fetch_trending_page(url)
+            candidates.extend(page_repos)
+            _safe_print(f"  抓取成功 {url} → {len(page_repos)} 条")
+        except Exception as exc:  # noqa: BLE001 — 单页失败不阻断
+            errors.append(f"{url}: {exc}")
+            _safe_print(f"  抓取失败 {url}: {exc}")
+        time.sleep(0.6)
 
     ranked = merge_rank_repos(candidates, limit)
     if not ranked:
         details = "; ".join(errors[:3])
-        raise RuntimeError(f"未能解析到 Trending 仓库，页面结构或网络可能异常：{details}")
+        raise RuntimeError(
+            f"未能解析到 Trending 仓库，页面结构或网络可能异常：{details}"
+        )
+    if len(ranked) < limit:
+        _safe_print(f"  警告：仅得到 {len(ranked)}/{limit} 个仓库，将按实际数量出榜")
     return ranked
 
 
@@ -210,7 +239,7 @@ def _llm_complete(system: str, user: str) -> str:
         }
         body: dict[str, Any] = {
             "model": model,
-            "max_tokens": 2048,
+            "max_tokens": 4096,
             "temperature": 0.4,
             "system": system,
             "messages": [{"role": "user", "content": user}],
@@ -290,6 +319,13 @@ def parse_editorial(
     return result
 
 
+def _fallback_summary(repo: dict[str, Any]) -> str:
+    desc = " ".join((repo.get("description") or "").split())
+    if desc:
+        return desc[:48] + ("…" if len(desc) > 48 else "")
+    return f"{repo.get('full_name', '未知仓库')} 今日新增关注"
+
+
 def llm_editorial(repos: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
     """为 Top10 生成一句话摘要，并为前三名补充结构化深读。"""
     payload_repos = [
@@ -322,8 +358,54 @@ def llm_editorial(repos: list[dict[str, Any]]) -> dict[int, dict[str, str]]:
         payload_repos, ensure_ascii=False, indent=2
     )
 
-    raw = _llm_complete(system, user)
-    return parse_editorial(raw, {r["rank"] for r in repos})
+    expected = {r["rank"] for r in repos}
+    last_error: Exception | None = None
+    for attempt in range(2):
+        try:
+            raw = _llm_complete(system, user)
+            return parse_editorial(raw, expected)
+        except Exception as exc:  # noqa: BLE001 — 允许一次重试
+            last_error = exc
+            _safe_print(f"  编辑内容解析失败，重试中（{attempt + 1}/2）: {exc}")
+
+    # 最后兜底：尽量用已解析部分 + 英文简介填空，避免 Actions 整单失败
+    try:
+        raw = _llm_complete(system, user)
+        body = _strip_code_fence(raw)
+        try:
+            items = json.loads(body)
+        except json.JSONDecodeError:
+            match = re.search(r"\[.*\]", body, re.S)
+            items = json.loads(match.group(0)) if match else []
+        partial: dict[int, dict[str, str]] = {}
+        for item in items if isinstance(items, list) else []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                rank = int(item.get("rank"))
+            except (TypeError, ValueError):
+                continue
+            if rank not in expected:
+                continue
+            partial[rank] = {
+                "summary": str(item.get("summary") or "").strip(),
+                "what": str(item.get("what") or "").strip(),
+                "why": str(item.get("why") or "").strip(),
+                "who": str(item.get("who") or "").strip(),
+            }
+        for repo in repos:
+            rank = repo["rank"]
+            item = partial.setdefault(
+                rank, {"summary": "", "what": "", "why": "", "who": ""}
+            )
+            if not item["summary"]:
+                item["summary"] = _fallback_summary(repo)
+        _safe_print("  已启用摘要兜底，保证榜单可推送")
+        return partial
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"LLM 编辑内容连续失败: {last_error}; 兜底也失败: {exc}"
+        ) from exc
 
 
 def _fmt_count(n: int) -> str:
@@ -574,6 +656,7 @@ if __name__ == "__main__":
     except Exception as exc:  # noqa: BLE001 — 定时任务需要明确失败退出码
         try:
             print(f"ERROR: {exc}", file=sys.stderr)
+            traceback.print_exc()
         except UnicodeEncodeError:
             print(f"ERROR: {exc!r}", file=sys.stderr)
         raise SystemExit(1)
