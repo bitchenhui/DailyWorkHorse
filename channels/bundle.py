@@ -24,11 +24,6 @@ def _actions(result: RenderResult) -> str:
             '<button class="primary" type="button" onclick="copyRich()">'
             "复制正文（富文本）</button>"
         )
-    if result.body_text:
-        buttons.append(
-            '<button class="primary" type="button" onclick="copyPlain()">'
-            "复制文案</button>"
-        )
     if result.target_url:
         buttons.append(
             f'<a class="button secondary" href="{html.escape(result.target_url, quote=True)}"'
@@ -41,10 +36,10 @@ def _gallery(result: RenderResult) -> str:
     if not result.images:
         return ""
     cards = "".join(
-        f'<figure class="shot"><img src="{html.escape(asset.name, quote=True)}" '
-        f'alt="{html.escape(asset.name)}" loading="lazy">'
-        f'<figcaption><span>{index}</span>'
-        f'<a download="{html.escape(asset.name, quote=True)}" '
+        f'<figure class="shot"><span class="seq">{index}</span>'
+        f'<img src="{html.escape(asset.name, quote=True)}" '
+        f'alt="第 {index} 张图卡" loading="lazy">'
+        f'<figcaption><a download="{html.escape(asset.name, quote=True)}" '
         f'href="{html.escape(asset.name, quote=True)}">下载</a></figcaption></figure>'
         for index, asset in enumerate(result.images, start=1)
     )
@@ -53,19 +48,31 @@ def _gallery(result: RenderResult) -> str:
         '<section class="block"><div class="block-head"><h2>图片素材</h2>'
         '<button class="ghost" type="button" onclick="downloadAll()">'
         "全部下载</button></div>"
+        '<p class="field-hint">按角标顺序上传；手机端长按图片即可保存。</p>'
         f'<div class="gallery">{cards}</div>'
         f"<script>const ASSETS = {names};</script></section>"
     )
 
 
-def _text_block(result: RenderResult) -> str:
-    if not result.body_text:
-        return ""
-    return (
-        '<section class="block"><div class="block-head"><h2>文案</h2></div>'
-        f'<textarea id="plain" rows="16" readonly>{html.escape(result.body_text)}'
-        "</textarea></section>"
-    )
+def _copy_blocks(result: RenderResult) -> str:
+    blocks: list[str] = []
+    for index, item in enumerate(result.copy_fields):
+        if not item.text:
+            continue
+        field_id = f"field{index}"
+        note = (
+            f'<p class="field-hint">{html.escape(item.hint)}</p>' if item.hint else ""
+        )
+        blocks.append(
+            '<section class="block"><div class="block-head">'
+            f"<h2>{html.escape(item.label)}</h2>"
+            f'<button class="ghost" type="button" '
+            f"onclick=\"copyField('{field_id}')\">复制</button></div>"
+            f"{note}"
+            f'<textarea id="{field_id}" rows="{item.rows}" readonly>'
+            f"{html.escape(item.text)}</textarea></section>"
+        )
+    return "".join(blocks)
 
 
 def _article_block(result: RenderResult) -> str:
@@ -104,6 +111,7 @@ def build_publish_page(result: RenderResult) -> str:
     .ghost {{ color:{ACCENT}; background:transparent; padding:6px 8px; }}
     .page {{ width:min(100%,700px); margin:22px auto 60px; padding:0 12px; }}
     .hint {{ margin:0 0 16px; color:{MUTED}; font-size:12px; line-height:1.8; }}
+    .field-hint {{ margin:-2px 0 8px; color:{MUTED}; font-size:12px; line-height:1.6; }}
     .block {{ margin:0 0 22px; }}
     .block-head {{ display:flex; align-items:center; justify-content:space-between;
       margin:0 0 10px; }}
@@ -111,12 +119,15 @@ def build_publish_page(result: RenderResult) -> str:
       letter-spacing:.04em; }}
     textarea {{ width:100%; padding:14px; border:1px solid #dde0e6; border-radius:10px;
       background:#fff; font:400 13px/1.75 inherit; color:{INK}; resize:vertical; }}
-    .gallery {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+    .gallery {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
       gap:12px; }}
-    .shot {{ margin:0; background:#fff; border:1px solid #e2e5ea; border-radius:10px;
-      overflow:hidden; }}
+    .shot {{ position:relative; margin:0; background:#fff; border:1px solid #e2e5ea;
+      border-radius:10px; overflow:hidden; }}
     .shot img {{ display:block; width:100%; height:auto; }}
-    .shot figcaption {{ display:flex; align-items:center; justify-content:space-between;
+    .seq {{ position:absolute; top:8px; left:8px; min-width:22px; height:22px;
+      border-radius:11px; background:{INK}; color:#fff; font:600 12px/22px sans-serif;
+      text-align:center; }}
+    .shot figcaption {{ display:flex; justify-content:flex-end;
       padding:8px 10px; font-size:12px; color:{MUTED}; }}
     .shot a {{ color:{ACCENT}; text-decoration:none; font-weight:600; }}
     #rich {{ background:{PAPER}; border-radius:10px;
@@ -142,7 +153,7 @@ def build_publish_page(result: RenderResult) -> str:
   </header>
   <main class="page">
     <p class="hint">{hint}</p>
-    {_text_block(result)}
+    {_copy_blocks(result)}
     {_gallery(result)}
     {_article_block(result)}
   </main>
@@ -176,8 +187,8 @@ def build_publish_page(result: RenderResult) -> str:
         toast("复制失败，请手动选择正文");
       }}
     }}
-    async function copyPlain() {{
-      const area = document.getElementById("plain");
+    async function copyField(id) {{
+      const area = document.getElementById(id);
       try {{
         await navigator.clipboard.writeText(area.value);
       }} catch (error) {{
@@ -186,7 +197,7 @@ def build_publish_page(result: RenderResult) -> str:
         document.execCommand("copy");
         area.setAttribute("readonly", "readonly");
       }}
-      toast("文案已复制");
+      toast("已复制");
     }}
     function downloadAll() {{
       if (typeof ASSETS === "undefined") return;

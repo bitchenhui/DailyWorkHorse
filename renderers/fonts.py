@@ -81,6 +81,23 @@ def _tokenize(text: str) -> list[str]:
     return tokens
 
 
+def _break_oversized(
+    token: str, font: ImageFont.ImageFont, max_width: float
+) -> list[str]:
+    """强行按字符切开比整行还宽的 token，例如超长的 owner/repo-name。"""
+    pieces: list[str] = []
+    current = ""
+    for char in token:
+        if current and text_width(current + char, font) > max_width:
+            pieces.append(current)
+            current = char
+        else:
+            current += char
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def wrap(
     text: str,
     font: ImageFont.ImageFont,
@@ -94,6 +111,13 @@ def wrap(
         if token == "\n":
             lines.append(current.rstrip())
             current = ""
+            continue
+        if text_width(token, font) > max_width:
+            if current.strip():
+                lines.append(current.rstrip())
+            pieces = _break_oversized(token, font, max_width)
+            lines.extend(pieces[:-1])
+            current = pieces[-1]
             continue
         candidate = current + token
         if current and text_width(candidate, font) > max_width:

@@ -26,18 +26,32 @@ class ImageAsset:
 
 
 @dataclass
+class CopyField:
+    """成稿页上一个可独立复制的纯文本字段。
+
+    发布后台的标题、正文、话题是分开的输入框，所以成品也要分开给，
+    合成一大段让人自己去切是最容易出错的地方。
+    """
+
+    label: str
+    text: str
+    hint: str = ""
+    rows: int = 4
+
+
+@dataclass
 class RenderResult:
     """某平台的完整成品。
 
-    ``body_html`` 与 ``body_text`` 按平台取舍：公众号需要富文本，小红书需要纯文本。
-    两者都填时，成稿页会同时给出两个复制按钮。
+    ``body_html`` 只在需要富文本粘贴的平台（公众号）填写；其余可复制内容
+    一律走 ``copy_fields``，成稿页会为每个字段单独给一个复制按钮。
     """
 
     platform: str
     platform_label: str
     title: str
     body_html: str = ""
-    body_text: str = ""
+    copy_fields: list[CopyField] = field(default_factory=list)
     images: list[ImageAsset] = field(default_factory=list)
     text_files: dict[str, str] = field(default_factory=dict)
     hint: str = ""

@@ -32,13 +32,26 @@ class SanitizeTests(unittest.TestCase):
 
 
 class WrapTests(unittest.TestCase):
-    def test_ascii_identifiers_are_not_split_mid_word(self) -> None:
+    def test_ascii_identifiers_are_not_split_when_they_fit(self) -> None:
         font = load_font(32)
+        name = "owner/some-long-project-name"
+        width = text_width(name, font) + 40
 
-        lines = wrap("owner/some-long-project-name 是一个很棒的项目", font, 300)
+        lines = wrap(f"{name} 是一个很棒的项目", font, width)
 
         self.assertGreater(len(lines), 1)
-        self.assertIn("owner/some-long-project-name", lines[0])
+        self.assertEqual(name, lines[0])
+
+    def test_token_wider_than_the_line_is_broken_by_character(self) -> None:
+        font = load_font(48)
+        name = "MakazhanAlpamys/super-long-project-name-for-layout-test"
+
+        lines = wrap(name, font, 400)
+
+        self.assertGreater(len(lines), 1)
+        for line in lines:
+            self.assertLessEqual(text_width(line, font), 400)
+        self.assertEqual(name, "".join(lines))
 
     def test_max_lines_truncates_with_ellipsis(self) -> None:
         font = load_font(32)
@@ -93,6 +106,18 @@ class CardDeckRendererTests(unittest.TestCase):
             self.assertIn(repo["full_name"], note)
         self.assertIn("#GitHub", note)
         self.assertTrue(note.startswith(bundle.social_title))
+
+    def test_title_and_tags_stay_out_of_the_body_field(self) -> None:
+        bundle = make_bundle(10)
+
+        result = carddeck.render(bundle)
+
+        fields = {item.label: item.text for item in result.copy_fields}
+        self.assertEqual(["标题", "正文", "话题标签"], list(fields))
+        self.assertEqual(bundle.social_title, fields["标题"])
+        # 正文要能直接粘进小红书的正文框，不该夹带标题或话题。
+        self.assertNotIn(bundle.social_title, fields["正文"])
+        self.assertNotIn("#", fields["正文"])
 
     def test_short_list_still_renders_without_list_cards(self) -> None:
         result = carddeck.render(make_bundle(3))

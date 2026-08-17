@@ -8,7 +8,7 @@ from html import escape as _esc
 from PIL import Image, ImageDraw
 
 from core.models import ContentBundle, Editorial, RepoItem
-from renderers.base import ImageAsset, RenderResult
+from renderers.base import CopyField, ImageAsset, RenderResult
 from renderers.fonts import center_text, load_font
 from renderers.format import fmt_count, fmt_delta
 from renderers.theme import (
@@ -278,6 +278,7 @@ def render(bundle: ContentBundle) -> RenderResult:
         platform_label=PLATFORM_LABEL,
         title=bundle.title,
         body_html=body_html,
+        copy_fields=[CopyField("标题", bundle.title, "公众号标题上限 64 字", rows=2)],
         images=[ImageAsset("cover.png", render_cover(bundle))],
         text_files={
             "article.html": _standalone_document(bundle.title, body_html),

@@ -18,21 +18,24 @@
 dist/
   index.html          # 分发总览，手机上打开这一页
   wechat_mp/
-    index.html        # 一键复制正文、下载封面
+    index.html        # 分字段复制、下载封面
     article.html      # 独立 HTML 成稿
     article.md        # 备用 Markdown 成稿
     cover.png         # 900×383 头条封面
   xhs/
-    index.html        # 一键复制文案、批量下载图卡
+    index.html        # 分字段复制、批量下载图卡
     card_01..06.png   # 1080×1440 竖版图卡
-    note.txt          # 笔记正文（含话题标签）
+    note.txt          # 完整笔记存档（标题 + 正文 + 话题）
 ```
 
 发布流程（两个平台各约 30 秒）：
 
 1. 从 PushPlus 通知打开**分发总览**
-2. 公众号：复制正文 → 粘贴到编辑器 → 上传封面 → 群发
-3. 小红书：按顺序上传 6 张图卡 → 粘贴文案 → 发布
+2. 公众号：复制标题与正文 → 粘贴到编辑器 → 上传封面 → 群发
+3. 小红书：按角标顺序上传 6 张图卡 → 分别复制标题、正文、话题 → 发布
+
+成稿页把标题、正文、话题拆成了独立的复制按钮，对应发布后台的各个输入框，
+省得在手机上从一大段文本里选中切分。
 
 图卡自动排版：封面含 Top5 预告，前三名各一张详情卡，第 4–10 名两张列表卡。
 中文字体没有 emoji 字形，渲染时会自动剥离表情符号，避免出现豆腐块。
@@ -126,6 +129,14 @@ python main.py --dry-run
 start dist\index.html
 ```
 
+只调排版，不联网也不消耗 LLM 额度（用内置的压力测试夹具：超长仓库名、超长与超短
+摘要、缺失字段）：
+
+```powershell
+python -m tools.preview
+start dist-preview\index.html
+```
+
 ## 文件说明
 
 按 `采集 → 加工 → 内容对象 → 渲染 → 投递` 分层，设计与后续多平台扩展见
@@ -145,6 +156,7 @@ renderers/theme.py           # 共用色板与字体栈
 channels/bundle.py           # 成稿包与平台通用发布页
 channels/overview.py         # 分发总览页
 channels/pushplus.py         # 微信消息通知
+tools/preview.py             # 压力测试夹具本地预览，调排版用
 requirements.txt
 .env.example
 .github/workflows/daily.yml  # 定时、Artifact 与 Pages 部署
@@ -159,3 +171,7 @@ tests/
 
 若开通 PushPlus 会员并绑定自己的公众号，也可在 PushPlus 后台把默认渠道改掉，
 或在请求里指定对应 `channel`/`webhook`，通知链路可复用。
+
+小红书没有官方发笔记接口（开放平台只覆盖电商、广告与数据读取），因此不存在
+「等资质到位就能走 API」的路径，全自动发布只能靠浏览器自动化，且有账号风险。
+权衡见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 的待决策项。

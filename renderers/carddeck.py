@@ -12,7 +12,7 @@ from __future__ import annotations
 from PIL import Image, ImageDraw
 
 from core.models import ContentBundle, RepoItem
-from renderers.base import ImageAsset, RenderResult
+from renderers.base import CopyField, ImageAsset, RenderResult
 from renderers.fonts import fit_font_size, load_font, sanitize, text_width, wrap
 from renderers.format import fmt_count, fmt_delta
 from renderers.theme import (
@@ -41,9 +41,20 @@ COVER_RULE = "#2b3042"
 COVER_HIGHLIGHT = "#cde5e1"
 
 COVER_PREVIEW_COUNT = 5
-COVER_ROW_HEIGHT = 108
+COVER_ROW_HEIGHT = 112
 DETAIL_COUNT = 3
 ITEMS_PER_LIST_CARD = 4
+
+# 详情卡的白卡高度随内容伸缩后整体居中：留白落在卡片外面像是设计，
+# 落在卡片里面就只是没填满。
+DETAIL_CARD_MIN_HEIGHT = 700
+DETAIL_CARD_MAX_HEIGHT = 1320
+DETAIL_TOP_PAD = 194  # 白卡顶到正文顶，中间是 RANK 行
+DETAIL_BOTTOM_PAD = 164  # 正文底到白卡底，中间是仓库地址
+
+
+def _clamp(value: int, low: int, high: int) -> int:
+    return max(low, min(value, high))
 
 
 def _canvas(background: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -91,11 +102,6 @@ def _spaced(text: str) -> str:
     return " ".join(text)
 
 
-def _balanced_top(top: int, bottom: int, content_height: int) -> int:
-    """把富余空间按 1:2 分给上下，内容略微偏上，比正居中更自然。"""
-    return top + max(0, (bottom - top - content_height) // 3)
-
-
 def _cover_title_font(text: str):
     """短标题用更大字号，避免封面上半部分显得空。"""
     if len(text) <= 10:
@@ -132,7 +138,7 @@ def _cover_card(bundle: ContentBundle) -> Image.Image:
 
     preview = bundle.repos[:COVER_PREVIEW_COUNT]
     # 上界保证 5 行预告不会撞上底部说明，下界避免短标题时中段过空。
-    rule_y = min(max(y + 114, 580), 670)
+    rule_y = _clamp(y + 114, 560, 640)
     draw.line((MARGIN, rule_y, WIDTH - MARGIN, rule_y), fill=COVER_RULE, width=2)
 
     rank_font = load_font(32, bold=True)
@@ -166,32 +172,17 @@ def _cover_card(bundle: ContentBundle) -> Image.Image:
 
 def _detail_card(bundle: ContentBundle, repo: RepoItem) -> Image.Image:
     image, draw = _canvas(PAPER)
-    draw.rounded_rectangle((56, 96, WIDTH - 56, HEIGHT - 96), radius=44, fill=SURFACE)
 
     inner_x = 112
     inner_width = WIDTH - inner_x * 2
 
-    draw.text(
-        (inner_x, 168),
-        _spaced(f"RANK {repo['rank']:02d}"),
-        font=load_font(26, bold=True),
-        fill=MUTED,
-    )
-    _pill(
-        draw,
-        WIDTH - inner_x,
-        156,
-        f"{fmt_delta(repo['stars_today'])} 今日",
-        load_font(28, bold=True),
-        ACCENT_SOFT,
-        ACCENT,
-    )
-
     name_font = load_font(54, bold=True)
-    summary_font = load_font(36)
+    summary_font = load_font(38)
     label_font = load_font(26, bold=True)
     value_font = load_font(32)
-    name_lh, summary_lh, value_lh = 74, 56, 50
+    name_lh, summary_lh, value_lh = 74, 58, 50
+    # meta_block 要容下 12px 上间距 + 28 号字行高 + 段后留白，取小了会压住摘要。
+    meta_block, summary_gap, section_gap = 96, 40, 34
 
     name_lines = wrap(repo["full_name"], name_font, inner_width, max_lines=2)
     summary_lines = wrap(
@@ -199,45 +190,75 @@ def _detail_card(bundle: ContentBundle, repo: RepoItem) -> Image.Image:
     )
     editorial = bundle.editorial_for(repo["rank"]) or {}
     sections = [
-        (label, wrap(editorial[key], value_font, inner_width, max_lines=3))
+        (label, wrap(editorial[key], value_font, inner_width, max_lines=2))
         for label, key in (("是什么", "what"), ("上涨原因", "why"), ("适合关注", "who"))
         if editorial.get(key)
     ]
 
     content_height = (
         len(name_lines) * name_lh
-        + 104  # 语言与累计星标一行及其上下留白
+        + meta_block
         + len(summary_lines) * summary_lh
-        + 36
-        + sum(44 + len(lines) * value_lh + 34 for _, lines in sections)
+        + summary_gap
+        + sum(44 + len(lines) * value_lh + section_gap for _, lines in sections)
     )
-    y = _balanced_top(250, HEIGHT - 230, content_height)
+    if sections:
+        content_height -= section_gap  # 末段不需要段后间距
 
+    card_height = _clamp(
+        DETAIL_TOP_PAD + content_height + DETAIL_BOTTOM_PAD,
+        DETAIL_CARD_MIN_HEIGHT,
+        DETAIL_CARD_MAX_HEIGHT,
+    )
+    card_top = (HEIGHT - card_height) // 2
+    card_bottom = card_top + card_height
+    draw.rounded_rectangle(
+        (56, card_top, WIDTH - 56, card_bottom), radius=44, fill=SURFACE
+    )
+
+    draw.text(
+        (inner_x, card_top + 72),
+        _spaced(f"RANK {repo['rank']:02d}"),
+        font=load_font(26, bold=True),
+        fill=MUTED,
+    )
+    _pill(
+        draw,
+        WIDTH - inner_x,
+        card_top + 60,
+        f"{fmt_delta(repo['stars_today'])} 今日",
+        load_font(28, bold=True),
+        ACCENT_SOFT,
+        ACCENT,
+    )
+
+    y = card_top + DETAIL_TOP_PAD
     y = _draw_lines(draw, (inner_x, y), name_lines, name_font, INK, name_lh)
     draw.text(
-        (inner_x, y + 14),
+        (inner_x, y + 12),
         f"{repo['language']} · 累计 {fmt_count(repo['stars_total'])}★",
         font=load_font(28),
         fill=MUTED,
     )
-    y += 104
+    y += meta_block
 
     y = _draw_lines(
         draw, (inner_x, y), summary_lines, summary_font, BODY_TEXT, summary_lh
     )
-    y += 36
+    y += summary_gap
 
     for label, lines in sections:
         draw.text((inner_x, y), label, font=label_font, fill=ACCENT)
         y = _draw_lines(
             draw, (inner_x, y + 44), lines, value_font, BODY_TEXT, value_lh
         )
-        y += 34
+        y += section_gap
 
+    url = repo["url"].replace("https://", "")
     draw.text(
-        (inner_x, HEIGHT - 190),
-        repo["url"].replace("https://", ""),
-        font=load_font(26),
+        (inner_x, card_bottom - 104),
+        url,
+        font=fit_font_size(url, inner_width, 26, 16),
         fill=MUTED,
     )
     return image
@@ -254,20 +275,29 @@ def _list_card(
         span += f" · {part}/{total_parts}"
     draw.text((MARGIN, 182), span, font=load_font(30), fill=MUTED)
 
-    card_height, gap = 240, 20
-    total_height = len(repos) * card_height + (len(repos) - 1) * gap
-    y = _balanced_top(262, HEIGHT - 60, total_height)
-
     rank_font = load_font(34, bold=True)
     delta_font = load_font(30, bold=True)
     summary_font = load_font(28)
+    inner_width = WIDTH - 104 * 2
 
-    for repo in repos:
+    # 统一用本卡最长的摘要决定卡片高度，条目等高才整齐；富余空间摊进间距，
+    # 条目少时靠拉开间距填满，而不是留一大块底部空白。
+    summaries = [
+        wrap(bundle.summary_for(repo), summary_font, inner_width, max_lines=2)
+        for repo in repos
+    ]
+    card_height = 118 + max(len(lines) for lines in summaries) * 44 + 46
+    available = (HEIGHT - 60) - 262
+    gap = _clamp(
+        (available - len(repos) * card_height) // (len(repos) + 1), 20, 120
+    )
+    y = 262 + gap
+
+    for repo, summary_lines in zip(repos, summaries):
         draw.rounded_rectangle(
             (56, y, WIDTH - 56, y + card_height), radius=32, fill=SURFACE
         )
         inner_x = 104
-        inner_width = WIDTH - inner_x * 2
 
         draw.text((inner_x, y + 44), f"{repo['rank']:02d}", font=rank_font, fill=ACCENT)
         delta = fmt_delta(repo["stars_today"])
@@ -285,12 +315,7 @@ def _list_card(
         draw.text((inner_x + 74, y + 40), repo["full_name"], font=name_font, fill=INK)
 
         _draw_lines(
-            draw,
-            (inner_x, y + 118),
-            wrap(bundle.summary_for(repo), summary_font, inner_width, max_lines=2),
-            summary_font,
-            BODY_TEXT,
-            44,
+            draw, (inner_x, y + 118), summary_lines, summary_font, BODY_TEXT, 44
         )
         y += card_height + gap
 
@@ -302,8 +327,19 @@ def _chunk(items: list[RepoItem], size: int) -> list[list[RepoItem]]:
 
 
 def build_note(bundle: ContentBundle) -> str:
-    """小红书笔记正文：保留完整项目名以命中站内搜索。"""
-    lines = [bundle.social_title, ""]
+    """存档用的完整笔记：标题、正文、话题拼成一份，便于事后回看。"""
+    parts = [bundle.social_title, "", build_note_body(bundle)]
+    if bundle.tags:
+        parts.extend(["", " ".join(f"#{tag}" for tag in bundle.tags)])
+    return "\n".join(parts).strip() + "\n"
+
+
+def build_note_body(bundle: ContentBundle) -> str:
+    """笔记正文，不含标题与话题——这两样在小红书是独立输入框。
+
+    保留完整项目名以命中站内搜索。
+    """
+    lines: list[str] = []
     if bundle.lede:
         lines.extend([bundle.lede, ""])
 
@@ -316,9 +352,7 @@ def build_note(bundle: ContentBundle) -> str:
         lines.append("")
 
     lines.append("数据来自 GitHub Trending 日榜，按当日新增 Star 排序，每天更新。")
-    if bundle.tags:
-        lines.extend(["", " ".join(f"#{tag}" for tag in bundle.tags)])
-    return "\n".join(lines).strip() + "\n"
+    return "\n".join(lines).strip()
 
 
 def render(bundle: ContentBundle) -> RenderResult:
@@ -338,18 +372,29 @@ def render(bundle: ContentBundle) -> RenderResult:
         )
 
     note = build_note(bundle)
-    hint = (
-        f"共 {len(images)} 张图卡，按顺序上传；复制文案粘贴到正文，"
-        "话题标签已附在末尾。"
-    )
+    hint = f"共 {len(images)} 张图卡，按序号顺序上传，第 1 张即封面。"
     if len(bundle.alt_titles) > 1:
         hint += "\n备选标题：" + " / ".join(bundle.alt_titles[1:])
+
+    copy_fields = [
+        CopyField("标题", bundle.social_title, "小红书标题上限 20 字", rows=2),
+        CopyField("正文", build_note_body(bundle), rows=16),
+    ]
+    if bundle.tags:
+        copy_fields.append(
+            CopyField(
+                "话题标签",
+                " ".join(f"#{tag}" for tag in bundle.tags),
+                "粘贴过去只是普通文字；想进话题页得在正文末尾逐个敲 # 再从下拉里选。",
+                rows=2,
+            )
+        )
 
     return RenderResult(
         platform=PLATFORM,
         platform_label=PLATFORM_LABEL,
         title=bundle.social_title,
-        body_text=note,
+        copy_fields=copy_fields,
         images=images,
         text_files={"note.txt": note},
         hint=hint,

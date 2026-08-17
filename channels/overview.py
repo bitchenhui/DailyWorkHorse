@@ -16,8 +16,7 @@ def _entry(result: RenderResult) -> str:
         counts.append(f"{len(result.images)} 张图")
     if result.body_html:
         counts.append("富文本正文")
-    if result.body_text:
-        counts.append("文案")
+    counts.extend(item.label for item in result.copy_fields if item.text)
     return f"""    <a class="entry" href="{html.escape(result.platform, quote=True)}/index.html">
       <span class="name">{html.escape(result.platform_label)}</span>
       <span class="meta">{html.escape(" · ".join(counts))}</span>
@@ -58,8 +57,8 @@ def build_overview_page(
     <h1>{html.escape(bundle.title)}</h1>
     <p class="date">{html.escape(bundle.date_text)} · 共 {len(results)} 个平台待发布</p>
 {entries}
-    <p class="note">每个平台的成稿页都带一键复制与素材下载。
-      公众号粘贴正文后记得上传封面；小红书按顺序上传图卡、粘贴文案即可。</p>
+    <p class="note">成稿页把标题、正文、话题拆成了独立的复制按钮，对应发布后台的各个输入框。
+      公众号粘贴正文后记得上传封面；小红书按角标顺序上传图卡。</p>
   </main>
 </body>
 </html>

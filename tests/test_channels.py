@@ -28,7 +28,7 @@ class BundleChannelTests(unittest.TestCase):
             page = (target / "index.html").read_text(encoding="utf-8")
             self.assertIn("复制正文（富文本）", page)
             self.assertIn("返回总览", page)
-            self.assertNotIn("复制文案", page)
+            self.assertNotIn("话题标签", page)
 
     def test_xhs_bundle_writes_every_card_and_note(self) -> None:
         bundle = make_bundle()
@@ -45,7 +45,7 @@ class BundleChannelTests(unittest.TestCase):
             self.assertEqual(6, len(list(target.glob("card_*.png"))))
 
             page = (target / "index.html").read_text(encoding="utf-8")
-            self.assertIn("复制文案", page)
+            self.assertIn("话题标签", page)
             self.assertIn("card_01.png", page)
             self.assertIn("全部下载", page)
             self.assertNotIn("复制正文（富文本）", page)
