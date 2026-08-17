@@ -88,6 +88,22 @@ def distribute(bundle: ContentBundle) -> list[RenderResult]:
     return results
 
 
+def notification_body(results: list[RenderResult]) -> str:
+    """挑一份适合塞进微信通知的正文。
+
+    优先公众号的富文本；没有就退回任意平台的第一个非空文本字段，
+    保证即使只启用了小红书，通知也不会是空的。
+    """
+    for result in results:
+        if result.platform == "wechat_mp" and result.body_html:
+            return result.body_html
+    for result in results:
+        for item in result.copy_fields:
+            if item.text:
+                return _esc(item.text).replace("\n", "<br>")
+    return ""
+
+
 def _draft_link_card(draft_url: str) -> str:
     """通知消息末尾的跳转按钮，引导到在线成稿页完成发布。"""
     safe_url = _esc(draft_url, quote=True)
@@ -114,9 +130,7 @@ def run(dry_run: bool = False) -> int:
         return 0
 
     safe_print("推送到微信 …")
-    push_content = next(
-        (r.body_html for r in results if r.platform == "wechat_mp"), ""
-    ) or results[0].body_text
+    push_content = notification_body(results)
     draft_url = os.environ.get("PUBLIC_DRAFT_URL", "").strip()
     if draft_url:
         push_content += _draft_link_card(draft_url)
