@@ -35,21 +35,32 @@ EMPTY_EDITORIAL: Editorial = {"summary": "", "what": "", "why": "", "who": ""}
 
 
 @dataclass
-class ContentBundle:
-    """管线的腰：上游只负责填充它，下游所有平台只依赖它。
+class Bundle:
+    """所有信息源共有的部分：一期内容的身份与社交平台文案。
 
-    后续阶段会补充小红书/短视频所需的 ``alt_titles``、``lede``、``tags``，
-    当前阶段仅包含公众号长图文实际用到的字段。
+    子类补充各自的领域数据。因为基类已有带默认值的字段，
+    **子类新增字段必须也带默认值**，否则 dataclass 会拒绝生成 __init__。
     """
 
     slug: str
     date_text: str
     title: str
-    repos: list[RepoItem] = field(default_factory=list)
-    editorial: dict[int, Editorial] = field(default_factory=dict)
     alt_titles: list[str] = field(default_factory=list)
     lede: str = ""
     tags: list[str] = field(default_factory=list)
+
+    @property
+    def social_title(self) -> str:
+        """社交平台优先用钩子式标题，缺失时退回主标题。"""
+        return self.alt_titles[0] if self.alt_titles else self.title
+
+
+@dataclass
+class ContentBundle(Bundle):
+    """管线的腰：上游只负责填充它，下游所有平台只依赖它。"""
+
+    repos: list[RepoItem] = field(default_factory=list)
+    editorial: dict[int, Editorial] = field(default_factory=dict)
 
     def editorial_for(self, rank: int) -> Editorial | None:
         return self.editorial.get(rank)
