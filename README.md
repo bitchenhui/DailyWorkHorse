@@ -1,16 +1,17 @@
 # wechatInforPush
 
-每天北京时间约 **08:30**，抓取 [GitHub Trending](https://github.com/trending?since=daily) 候选，**按今日新增 stars 严格降序**取 Top10，用大模型为日增最高的前三名写中文深度解读，经 **PushPlus** 推送到微信。
+每天北京时间约 **08:30**，聚合 [GitHub Trending](https://github.com/trending?since=daily) 综合榜与主流语言榜候选，**按今日新增 stars 严格降序**取 Top10，用大模型为全部项目生成中文摘要，并为前三名补充深度解读，经 **PushPlus** 推送到微信。
 
-> 说明：GitHub Trending 页面顺序是平台热度算法，不等于日增 stars 排序；本脚本会本地重排后再出榜。
+> 说明：GitHub 没有官方“全站日增 stars Top10”接口。本榜单是 Trending 综合榜与主流语言榜候选池内的日增排名，并非全 GitHub 的数学全量榜。
 
 > 推送走 PushPlus 官方公众号；你自己的个人未认证公众号继续做内容经营，互不冲突。
 
 ## 消息长什么样
 
-- 标题：`🔥 GitHub 今日热榜 · YYYY-MM-DD`
-- **深度精选 Top3**：是什么 / 为何火 / 适合谁
-- **完整榜单 Top10**：链接、日增★、语言、总星、简介
+- 标题：`开源升温榜｜今日增长最快的 10 个 GitHub 项目`
+- HTML 公众号卡片排版，适配微信移动端阅读
+- **前三观察**：中文摘要 + 是什么 / 上涨原因 / 适合关注
+- **第 4–10 名**：仓库链接、日增★、语言、总星、中文一句话总结
 
 ## 一次性配置
 
