@@ -1,36 +1,59 @@
 # wechatInforPush
 
-每天北京时间约 **08:30**，聚合 [GitHub Trending](https://github.com/trending?since=daily) 综合榜与主流语言榜候选，**按今日新增 stars 严格降序**取 Top10，用大模型为全部项目生成中文摘要，并为前三名补充深度解读，经 **PushPlus** 推送到微信。
+每天北京时间约 **08:30**，聚合 [GitHub Trending](https://github.com/trending?since=daily) 综合榜与主流语言榜候选，**按今日新增 stars 严格降序**取 Top10，用大模型生成中文摘要与前三名深度解读，再分别产出 **微信公众号** 与 **小红书** 两份可直接发布的成稿，并经 **PushPlus** 推一条微信通知。
 
 > 说明：GitHub 没有官方“全站日增 stars Top10”接口。本榜单是 Trending 综合榜与主流语言榜候选池内的日增排名，并非全 GitHub 的数学全量榜。
 
-> 推送走 PushPlus 官方公众号；你自己的个人未认证公众号继续做内容经营，互不冲突。
+> 通知走 PushPlus 官方公众号；你自己的个人未认证公众号继续做内容经营，互不冲突。
 
-## 半自动发布到个人公众号
+## 半自动分发
 
-Actions 每天同时生成并保存：
+个人未认证订阅号拿不到公众号发布 API，小红书也不对个人开放笔记接口，
+所以自动化边界划在**成稿**上：机器做到 100% 成品，你只负责最后一次粘贴上传。
+设计取舍与后续升级路径见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-- `index.html`：在线预览页，支持一键复制公众号正文
-- `article.html`：独立 HTML 成稿
-- `article.md`：备用 Markdown 成稿
-- `cover.png`：900×383 公众号头条封面，核心文字位于中央安全区
+每天产出的 `dist/` 结构：
 
-你的发布流程：
+```
+dist/
+  index.html          # 分发总览，手机上打开这一页
+  wechat_mp/
+    index.html        # 一键复制正文、下载封面
+    article.html      # 独立 HTML 成稿
+    article.md        # 备用 Markdown 成稿
+    cover.png         # 900×383 头条封面
+  xhs/
+    index.html        # 一键复制文案、批量下载图卡
+    card_01..06.png   # 1080×1440 竖版图卡
+    note.txt          # 笔记正文（含话题标签）
+```
 
-1. 从 PushPlus 打开最新成稿
-2. 点击 **复制公众号正文**，粘贴到公众号编辑器
-3. 下载并上传 `cover.png`
-4. 预览并群发
+发布流程（两个平台各约 30 秒）：
 
-Actions 的 `wechat-draft-*` Artifact 保存每期完整素材 30 天；GitHub Pages
+1. 从 PushPlus 通知打开**分发总览**
+2. 公众号：复制正文 → 粘贴到编辑器 → 上传封面 → 群发
+3. 小红书：按顺序上传 6 张图卡 → 粘贴文案 → 发布
+
+图卡自动排版：封面含 Top5 预告，前三名各一张详情卡，第 4–10 名两张列表卡。
+中文字体没有 emoji 字形，渲染时会自动剥离表情符号，避免出现豆腐块。
+
+Actions 的 `daily-drafts-*` Artifact 保存每期完整素材 30 天；GitHub Pages
 展示最新一期。
 
-## 消息长什么样
+## 内容长什么样
+
+公众号长图文：
 
 - 标题：`开源升温榜｜今日增长最快的 10 个 GitHub 项目`
-- HTML 公众号卡片排版，适配微信移动端阅读
+- HTML 卡片排版，适配微信移动端阅读
 - **前三观察**：中文摘要 + 是什么 / 上涨原因 / 适合关注
 - **第 4–10 名**：仓库链接、日增★、语言、总星、中文一句话总结
+
+小红书笔记：
+
+- 标题由大模型另出一版钩子式短句（限 20 字），备选标题附在成稿页
+- 图卡承载信息主体，正文保留完整项目名以命中站内搜索
+- 话题标签自动生成，覆盖开源、语言、应用方向
 
 ## 一次性配置
 
@@ -63,6 +86,12 @@ Actions 的 `wechat-draft-*` Artifact 保存每期完整素材 30 天；GitHub P
 | `LLM_API_KEY` | 大模型 API Key |
 | `LLM_API_BASE` | API Base URL（不要末尾多余路径以外的 `/chat/completions`） |
 | `LLM_MODEL` | 模型名 |
+
+可选的仓库 **Variables**（Settings → Secrets and variables → Actions → Variables）：
+
+| Name | 说明 |
+|------|------|
+| `ENABLED_PLATFORMS` | 启用哪些平台，逗号分隔，留空为全部。只做公众号就填 `wechat_mp` |
 
 ### 4. 打开 Actions 与 Pages
 
@@ -99,15 +128,34 @@ start dist\index.html
 
 ## 文件说明
 
+按 `采集 → 加工 → 内容对象 → 渲染 → 投递` 分层，设计与后续多平台扩展见
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
 ```
-main.py                      # 抓取 + LLM + PushPlus
-publisher.py                 # 公众号成稿、复制页与封面生成
+main.py                      # CLI 入口
+pipeline.py                  # 编排：采集 → 加工 → 逐平台渲染 → 逐平台投递
+core/                        # 内容模型、LLM 客户端、配置、控制台
+sources/github_trending.py   # 采集：抓取、去重、按日增 stars 重排
+enrich/editorial.py          # LLM 中文摘要与 Top3 深度解读
+enrich/social.py             # LLM 小红书钩子标题、导语、话题标签
+renderers/article.py         # 公众号长图文 HTML + 900×383 封面
+renderers/carddeck.py        # 小红书 1080×1440 图卡组 + 笔记正文
+renderers/fonts.py           # 字体加载、中英混排折行、emoji 剥离
+renderers/theme.py           # 共用色板与字体栈
+channels/bundle.py           # 成稿包与平台通用发布页
+channels/overview.py         # 分发总览页
+channels/pushplus.py         # 微信消息通知
 requirements.txt
 .env.example
 .github/workflows/daily.yml  # 定时、Artifact 与 Pages 部署
-tests/test_main.py
+tests/
 ```
 
-## 以后换成自己的服务号
+## 以后升级投递方式
 
-若日后有了**已认证服务号**并开通 PushPlus 会员绑定成功，一般只需在 PushPlus 后台把默认渠道改成你的公众号，或在请求里指定对应 `channel`/`webhook`，脚本主体可复用。
+各平台的投递档位由 `<PLATFORM>_TIER` 环境变量控制，目前只实现 `bundle`（成稿包）。
+若日后拿到**已认证服务号**，可实现 `api` 档位走公众号官方发布接口，
+内容与渲染层无需改动。详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+若开通 PushPlus 会员并绑定自己的公众号，也可在 PushPlus 后台把默认渠道改掉，
+或在请求里指定对应 `channel`/`webhook`，通知链路可复用。
