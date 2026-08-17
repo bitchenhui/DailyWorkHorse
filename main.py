@@ -59,6 +59,11 @@ def parse_int(text: str | None) -> int:
 
 
 def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
+    """抓取 GitHub Trending 日榜候选，再按今日新增 stars 严格降序取 TopN。
+
+    注意：github.com/trending 页面顺序是热度算法，不等于日增 stars 排序，
+    所以必须本地按 stars_today 重排。
+    """
     resp = requests.get(
         TRENDING_URL,
         headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9"},
@@ -93,7 +98,6 @@ def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
 
         repos.append(
             {
-                "rank": len(repos) + 1,
                 "full_name": full_name,
                 "url": urljoin("https://github.com", href),
                 "description": desc_el.get_text(" ", strip=True) if desc_el else "",
@@ -103,12 +107,16 @@ def fetch_trending(limit: int = 10) -> list[dict[str, Any]]:
                 "stars_today": stars_today,
             }
         )
-        if len(repos) >= limit:
-            break
 
     if not repos:
         raise RuntimeError("未能解析到任何 Trending 仓库，页面结构可能已变化")
-    return repos
+
+    # 日增 stars 降序；同日增时总 stars 高者优先
+    repos.sort(key=lambda r: (r["stars_today"], r["stars_total"]), reverse=True)
+    top = repos[:limit]
+    for i, r in enumerate(top, start=1):
+        r["rank"] = i
+    return top
 
 
 def _is_anthropic_base(api_base: str) -> bool:
@@ -209,13 +217,14 @@ def build_message(repos: list[dict[str, Any]], deep_dive: str) -> tuple[str, str
     lines = [
         f"# {title}",
         "",
-        "> 数据来源：[GitHub Trending · Today](https://github.com/trending?since=daily)",
+        "> 数据来源：[GitHub Trending · Today](https://github.com/trending?since=daily)  "
+        "（候选池抓取后按 **今日新增 ★ 降序** 重排）",
         "",
-        "## 深度精选 · Top3",
+        "## 深度精选 · Top3（日增最高）",
         "",
         deep_dive,
         "",
-        "## 完整榜单 · Top10",
+        "## 完整榜单 · Top10（按日增 ★ 降序）",
         "",
     ]
     for r in repos:

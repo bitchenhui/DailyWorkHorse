@@ -1,6 +1,8 @@
 # wechatInforPush
 
-每天北京时间约 **08:30**，抓取 [GitHub Trending](https://github.com/trending?since=daily) Top10，用大模型为前三名写中文深度解读，经 **PushPlus** 推送到微信。
+每天北京时间约 **08:30**，抓取 [GitHub Trending](https://github.com/trending?since=daily) 候选，**按今日新增 stars 严格降序**取 Top10，用大模型为日增最高的前三名写中文深度解读，经 **PushPlus** 推送到微信。
+
+> 说明：GitHub Trending 页面顺序是平台热度算法，不等于日增 stars 排序；本脚本会本地重排后再出榜。
 
 > 推送走 PushPlus 官方公众号；你自己的个人未认证公众号继续做内容经营，互不冲突。
 
