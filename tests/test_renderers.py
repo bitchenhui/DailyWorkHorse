@@ -35,22 +35,26 @@ class WrapTests(unittest.TestCase):
     def test_ascii_identifiers_are_not_split_when_they_fit(self) -> None:
         font = load_font(32)
         name = "owner/some-long-project-name"
-        width = text_width(name, font) + 40
+        # 宽度按标识符自身的倍数给，任何字体下都装得下它，
+        # 用绝对像素余量的话换不换行会随字体度量翻转。
+        width = text_width(name, font) * 2
 
         lines = wrap(f"{name} 是一个很棒的项目", font, width)
 
-        self.assertGreater(len(lines), 1)
-        self.assertEqual(name, lines[0])
+        self.assertTrue(
+            any(name in line for line in lines), f"标识符被拆开了: {lines}"
+        )
 
     def test_token_wider_than_the_line_is_broken_by_character(self) -> None:
         font = load_font(48)
         name = "MakazhanAlpamys/super-long-project-name-for-layout-test"
+        width = text_width(name, font) / 4
 
-        lines = wrap(name, font, 400)
+        lines = wrap(name, font, width)
 
         self.assertGreater(len(lines), 1)
         for line in lines:
-            self.assertLessEqual(text_width(line, font), 400)
+            self.assertLessEqual(text_width(line, font), width)
         self.assertEqual(name, "".join(lines))
 
     def test_max_lines_truncates_with_ellipsis(self) -> None:
