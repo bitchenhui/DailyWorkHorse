@@ -106,19 +106,80 @@ def _tone(value: float) -> tuple[str, str]:
     return (RISE, RISE_SOFT) if value >= 0 else (FALL, FALL_SOFT)
 
 
-def _header(draw: ImageDraw.ImageDraw, title: str, subtitle: str) -> None:
+def _header(draw: ImageDraw.ImageDraw, title: str, subtitle: str = "") -> None:
     draw.text((MARGIN, 96), title, font=load_font(60, bold=True), fill=STAGE_INK)
-    draw.text((MARGIN, 186), subtitle, font=load_font(32), fill=STAGE_MUTED)
+    if subtitle:
+        draw.text((MARGIN, 186), subtitle, font=load_font(32), fill=STAGE_MUTED)
 
 
-def _clock(draw: ImageDraw.ImageDraw, moment: str) -> None:
-    font = load_font(52, bold=True)
-    draw.text(
-        (WIDTH - MARGIN - text_width(moment, font), 100),
-        moment,
-        font=font,
-        fill=STAGE_INK,
+# 交易时段（分钟）：上午 09:31–11:30、下午 13:01–15:00，各 119 分钟。
+# 午休那段没有数据点，时刻会从 11:30 直接跳到 13:01，映射到进度条上就是
+# 停在正中，正好当成「上半场打完」。
+_AM_START, _AM_END = 9 * 60 + 31, 11 * 60 + 30
+_PM_START, _PM_END = 13 * 60 + 1, 15 * 60
+_AM_LEN = _AM_END - _AM_START
+_SESSION_LEN = _AM_LEN + (_PM_END - _PM_START)
+
+
+def _session_progress(moment: str) -> float:
+    """把 "HH:MM" 映射到当日交易进度 [0,1]，午休按半场处理。"""
+    try:
+        minutes = int(moment[:2]) * 60 + int(moment[3:5])
+    except (ValueError, IndexError):
+        return 0.0
+    if minutes <= _AM_START:
+        return 0.0
+    if minutes <= _AM_END:
+        return (minutes - _AM_START) / _SESSION_LEN
+    if minutes < _PM_START:
+        return _AM_LEN / _SESSION_LEN
+    if minutes >= _PM_END:
+        return 1.0
+    return (_AM_LEN + (minutes - _PM_START)) / _SESSION_LEN
+
+
+def _session_bar(draw: ImageDraw.ImageDraw, moment: str) -> None:
+    """会话进度条：9:31 ━━●──── 15:00，当前时刻浮在滑块正上方。
+
+    比一个裸的 HH:MM 数字多给一层「离收盘还有多远」的进度感——越往后
+    条越满，收盘时填满，观众能感到这一天在往前走。
+    """
+    end_font = load_font(26)
+    left, right = "9:31", "15:00"
+    left_w = text_width(left, end_font)
+    right_w = text_width(right, end_font)
+
+    x0, x1 = MARGIN, WIDTH - MARGIN
+    track_left = x0 + left_w + 20
+    track_right = x1 - right_w - 20
+    y = 232
+    height = 8
+    radius = height // 2
+
+    frac = _session_progress(moment)
+    mark_x = int(track_left + (track_right - track_left) * frac)
+
+    draw.text((x0, y - 9), left, font=end_font, fill=STAGE_MUTED)
+    draw.text((x1 - right_w, y - 9), right, font=end_font, fill=STAGE_MUTED)
+
+    draw.rounded_rectangle(
+        (track_left, y, track_right, y + height), radius=radius, fill=STAGE_LINE
     )
+    draw.rounded_rectangle(
+        (track_left, y, max(track_left + height, mark_x), y + height),
+        radius=radius, fill=ACCENT,
+    )
+    dot = 12
+    cy = y + height // 2
+    draw.ellipse(
+        (mark_x - dot, cy - dot, mark_x + dot, cy + dot),
+        fill=ACCENT, outline=STAGE, width=3,
+    )
+
+    time_font = load_font(36, bold=True)
+    time_w = text_width(moment, time_font)
+    time_x = min(max(mark_x - time_w // 2, x0), x1 - time_w)
+    draw.text((time_x, 172), moment, font=time_font, fill=ACCENT)
 
 
 def _disclaimer(draw: ImageDraw.ImageDraw) -> None:
@@ -353,7 +414,7 @@ def _race_frames(
     for frame in layout(tracked):
         image, draw = _canvas()
         _header(draw, title, subtitle)
-        _clock(draw, frame.moment)
+        _session_bar(draw, frame.moment)
 
         # 从下往上画：名次靠前的后画，交换过程中榜首永远压在最上层，
         # 不会被正在上升的那张卡片盖住。
@@ -406,10 +467,10 @@ def _cover_frames(
     date_text: str,
     seconds: float,
 ) -> Iterator[Image.Image]:
-    """封面：标题 + 三大指数 + 当日资金之最。
+    """封面：标题 + 大盘变化 + 当日资金之最（流入/流出各前二）。
 
-    预告放最大流入与最大流出板块，既填满版面，也让划到这一帧的人
-    立刻知道接下来要讲什么。
+    预告放两端各前二的板块，既填满版面，也让划到这一帧的人立刻知道
+    接下来要讲什么。封面只停很短一下就切进赛跑，别让开头卡着不动。
     """
     image, draw = _canvas()
 
@@ -418,32 +479,32 @@ def _cover_frames(
         (MARGIN, 248), "今日资金流向", font=load_font(88, bold=True), fill=STAGE_INK
     )
     draw.text(
-        (MARGIN, 380),
+        (MARGIN, 372),
         f"{date_text} · 主力资金当日累计净流入",
-        font=load_font(32),
+        font=load_font(40),
         fill=STAGE_MUTED,
     )
 
     draw.rounded_rectangle(
-        (MARGIN, 470, WIDTH - MARGIN, 790), radius=44,
+        (MARGIN, 452, WIDTH - MARGIN, 772), radius=44,
         fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
-    _index_strip(draw, indexes, 560)
+    draw.text((MARGIN + 40, 486), "大盘变化", font=load_font(32, bold=True), fill=STAGE_MUTED)
+    _index_strip(draw, indexes, 592)
 
     draw.rounded_rectangle(
-        (MARGIN, 850, WIDTH - MARGIN, 1500), radius=44,
+        (MARGIN, 822, WIDTH - MARGIN, 1560), radius=44,
         fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
-    draw.text((MARGIN + 40, 896), "今日之最", font=load_font(32, bold=True), fill=STAGE_MUTED)
+    draw.text((MARGIN + 40, 856), "今日之最", font=load_font(32, bold=True), fill=STAGE_MUTED)
 
-    labels = ("流入榜首", "流入第二")
-    picks = [(labels[order], row) for order, row in enumerate(list(inflow)[:2])]
-    picks += [("流出榜首", row) for row in list(outflow)[:1]]
+    picks = [(label, row) for label, row in zip(("流入榜首", "流入第二"), list(inflow)[:2])]
+    picks += [(label, row) for label, row in zip(("流出榜首", "流出第二"), list(outflow)[:2])]
     for order, (label, row) in enumerate(picks):
-        _highlight(draw, 986 + order * 160, label, row["name"], row["net_inflow"])
+        _highlight(draw, 944 + order * 150, label, row["name"], row["net_inflow"])
 
     draw.text(
-        (MARGIN, 1596),
+        (MARGIN, 1610),
         "钱从哪个行业流出，又流进了谁",
         font=load_font(38),
         fill=STAGE_MUTED,
@@ -490,47 +551,38 @@ def _flow_line(
     )
 
 
-# 结论页两块的固定高度：行业榜首一行 + 个股前三三行，够装且不至于两块挤在一起。
-CLOSING_BLOCK_HEIGHT = 500
+# 结论页个股块固定高度：标题一行 + 前三三行，够装且两块不至于挤在一起。
 CLOSING_TOP3 = 3
 
 
-def _closing_block(
+def _stock_block(
     draw: ImageDraw.ImageDraw,
     top: int,
     label: str,
     label_color: str,
     soft: str,
-    leader: dict | None,
     stocks: Sequence[dict],
-    stocks_label: str,
 ) -> None:
-    """结论页的一块：标题 + 行业榜首 + 个股前三。流入用红块、流出用绿块。"""
+    """结论页的个股块：标题 + 前三。抢筹用红块、抛售用绿块。"""
     draw.rounded_rectangle(
-        (MARGIN, top, WIDTH - MARGIN, top + CLOSING_BLOCK_HEIGHT),
+        (MARGIN, top, WIDTH - MARGIN, top + 380),
         radius=44, fill=soft, outline=STAGE_LINE, width=1,
     )
     draw.text((MARGIN + 40, top + 30), label, font=load_font(30, bold=True), fill=label_color)
-    if leader:
-        _flow_line(draw, top + 92, leader["name"], leader["net_inflow"], size=48, tag="行业")
-    draw.text(
-        (MARGIN + 40, top + 182),
-        stocks_label,
-        font=load_font(26, bold=True),
-        fill=STAGE_MUTED,
-    )
     for order, stock in enumerate(list(stocks)[:CLOSING_TOP3]):
         _flow_line(
-            draw, top + 230 + order * 78, stock["name"], stock["net_inflow"],
-            size=40, rank=order + 1,
+            draw, top + 100 + order * 88, stock["name"], stock["net_inflow"],
+            size=42, rank=order + 1,
         )
 
 
 def _closing_frames(bundle: MarketBundle, seconds: float) -> Iterator[Image.Image]:
-    """结尾结论定格页：一句话总结当日资金主线 + 行业榜首 + 个股前三两端。
+    """结尾结论定格页：一句话主线 → 板块两端（呼应主线）→ 个股前三。
 
-    个股不再单独走一段赛跑，最终的流入/流出前三都收在这里一次给全。
-    视频号/抖音会把最后这一帧当封面缩略图，所以要能独立成图、一眼读懂。
+    板块结论在上、个股前三在下，分区呈现：先用板块两端坐实「今日结论」那
+    句话，再把当日抢筹/抛售的个股前三附在下面。个股不再单独走赛跑，最终
+    名次都收在这里一次给全。视频号/抖音会把最后这一帧当封面缩略图，所以
+    要能独立成图、一眼读懂。
     """
     top_in = bundle.sector_inflow[0] if bundle.sector_inflow else None
     top_out = bundle.sector_outflow[0] if bundle.sector_outflow else None
@@ -546,30 +598,30 @@ def _closing_frames(bundle: MarketBundle, seconds: float) -> Iterator[Image.Imag
     else:
         headline = "今日资金主线"
     draw.text((MARGIN, 256), headline, font=load_font(72, bold=True), fill=STAGE_INK)
-    draw.text(
-        (MARGIN, 372),
-        f"{bundle.date_text} · 主力资金当日累计净流入",
-        font=load_font(32),
-        fill=STAGE_MUTED,
-    )
 
-    _closing_block(
-        draw, 466, "资金抢筹", RISE, RISE_SOFT,
-        top_in, bundle.stock_inflow, "个股抢筹前三",
+    # 板块两端：坐实上面那句结论，给出行业榜首的具体数字。
+    draw.rounded_rectangle(
+        (MARGIN, 440, WIDTH - MARGIN, 700), radius=44,
+        fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
-    _closing_block(
-        draw, 996, "资金撤离", FALL, FALL_SOFT,
-        top_out, bundle.stock_outflow, "个股抛售前三",
-    )
+    draw.text((MARGIN + 40, 470), "板块资金两端", font=load_font(30, bold=True), fill=STAGE_MUTED)
+    if top_in:
+        _flow_line(draw, 534, top_in["name"], top_in["net_inflow"], size=52, tag="流入")
+    if top_out:
+        _flow_line(draw, 616, top_out["name"], top_out["net_inflow"], size=52, tag="流出")
+
+    # 个股前三：附在板块结论下面，抢筹一块、抛售一块。
+    _stock_block(draw, 736, "个股抢筹前三", RISE, RISE_SOFT, bundle.stock_inflow)
+    _stock_block(draw, 1148, "个股抛售前三", FALL, FALL_SOFT, bundle.stock_outflow)
 
     draw.text(
-        (MARGIN, 1548),
+        (MARGIN, 1566),
         "红为主力净流入，绿为净流出",
         font=load_font(30),
         fill=STAGE_MUTED,
     )
     draw.text(
-        (MARGIN, 1612),
+        (MARGIN, 1626),
         "关注一下，每天一分钟看懂 A 股资金去向",
         font=load_font(38, bold=True),
         fill=STAGE_INK,
@@ -592,19 +644,18 @@ def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
         bundle.sector_inflow,
         bundle.sector_outflow,
         bundle.date_text,
-        seconds=2.4,
+        # 封面只当个引子，很快切进赛跑——停太久开头会像卡住不动。
+        seconds=0.2,
     )
-    # 标题里的行业数按**真正上场的**行业数写。上游少匹配上几个的时候，
-    # 写死 31 就成了画面上数得出来的错。
-    racing = sum(1 for row in bundle.sectors if row.get("series"))
     yield from _race_frames(
         bundle.sectors,
-        f"{racing} 个行业资金赛跑",
-        f"{bundle.date_text} · 申万一级 · 主力资金当日累计净流入",
+        "A股各板块资金流向",
+        # 不带副标题：多一行小字反而挤，标题一句已说清是什么。
+        "",
         # 31 行需要给够读完的时间。
         hold_seconds=2.5,
     )
-    yield from _closing_frames(bundle, seconds=3.2)
+    yield from _closing_frames(bundle, seconds=1.0)
 
 
 def build_social_title(bundle: MarketBundle) -> str:

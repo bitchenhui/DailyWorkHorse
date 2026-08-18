@@ -111,7 +111,7 @@ class StructureTests(unittest.TestCase):
         """
         bundle = make_market_bundle(minutes=2)
         seq = list(marketvideo.frames(bundle))
-        hold = int(3.2 * marketvideo.FPS)
+        hold = int(1.0 * marketvideo.FPS)
 
         tail = seq[-hold:]
         self.assertTrue(
