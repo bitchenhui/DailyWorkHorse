@@ -119,24 +119,33 @@ class ContentBundle(Bundle):
         return self.alt_titles[0] if self.alt_titles else self.title
 
 
+# 封面与文案在行业两端各取几名。视频的板块段跑满全部行业，
+# 但封面放不下 31 行，文案列全了也没人读。
+SECTOR_EDGE = 5
+
+
 @dataclass
 class MarketBundle(Bundle):
-    """行情日报的领域数据：指数快照，以及资金流的两端。
+    """行情日报的领域数据：指数快照、行业资金流全表与个股资金流两端。
 
-    流入与流出分开存而不是合成一张榜，是因为它们是两次不同的排序请求，
-    合并后再想还原「哪些是榜首、哪些是榜尾」反而要重新判断。
+    行业存的是**全集**而非两端，因为视频要让 31 个申万一级行业同场赛跑；
+    个股反过来存两端，因为全 A 五千多只跑不动，只能各取榜首若干。
     """
 
     indexes: list[IndexQuote] = field(default_factory=list)
-    sector_inflow: list[Sector] = field(default_factory=list)
-    sector_outflow: list[Sector] = field(default_factory=list)
+    sectors: list[Sector] = field(default_factory=list)
     stock_inflow: list[Stock] = field(default_factory=list)
     stock_outflow: list[Stock] = field(default_factory=list)
 
     @property
-    def sectors(self) -> list[Sector]:
-        """按净流入从高到低排好的板块全集，画面按这个顺序入场。"""
-        return self.sector_inflow + self.sector_outflow
+    def sector_inflow(self) -> list[Sector]:
+        """净流入榜首若干。``sectors`` 已按净流入降序，取头即可。"""
+        return self.sectors[:SECTOR_EDGE]
+
+    @property
+    def sector_outflow(self) -> list[Sector]:
+        """净流出榜首若干，流出最多的排在最前。"""
+        return self.sectors[: -SECTOR_EDGE - 1 : -1]
 
     @property
     def stocks(self) -> list[Stock]:

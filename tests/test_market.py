@@ -163,8 +163,7 @@ class TradingDayTests(unittest.TestCase):
             "trading_date": trading_date,
             "last_clock": last_clock,
             "indexes": [],
-            "sector_inflow": [],
-            "sector_outflow": [],
+            "sectors": [],
             "stock_inflow": [],
             "stock_outflow": [],
         }

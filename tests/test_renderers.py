@@ -3,6 +3,7 @@ import unittest
 from renderers import article, carddeck
 from renderers.fonts import load_font, sanitize, text_width, wrap
 from renderers.format import fmt_count, fmt_delta
+from renderers.theme import STAR_GOLD
 from tests.fixtures import make_bundle
 
 
@@ -86,6 +87,16 @@ class ArticleRendererTests(unittest.TestCase):
         bundle = make_bundle()
 
         self.assertIn("2026-08-17", article.render(bundle).body_html)
+
+    def test_body_html_is_wechat_paste_friendly(self) -> None:
+        """公众号编辑器会剥掉 float、border-radius 和 font 简写。"""
+        body = article.render(make_bundle()).body_html
+
+        self.assertNotIn("float:", body)
+        self.assertNotIn("border-radius", body)
+        self.assertNotIn("font:", body)
+        self.assertIn("<section", body)
+        self.assertIn(f'color:{STAR_GOLD}', body)
 
 
 class CardDeckRendererTests(unittest.TestCase):

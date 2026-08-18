@@ -11,8 +11,8 @@
 - **单一标尺，不给流出组单独放大**。流入前五动辄几百亿、流出前五只有几十亿时，
   流出的条会短到几乎看不见——但这个悬殊本身就是当天最重要的信息（资金单边
   抢筹），双标尺会把它抹平。折中办法是给条形一个最小可见长度兜底。
-- **行高按条目数自适应**。板块段 10 行、个股段 12 行，写死行高必然有一段
-  要么挤出画布要么空半屏。
+- **行高按条目数自适应**。板块段 31 行、个股段 12 行，写死行高必然有一段
+  要么挤出画布要么空半屏。行矮到一定程度还要换掉整个行样式，见 ``COMPACT_CARD``。
 
 帧以生成器逐帧吐出，不在内存里堆整段视频：1080×1920 一帧就是 6MB，
 二十多秒的量足以把内存吃穿。
@@ -48,14 +48,21 @@ TAGS = ("A股", "股市", "资金流向", "行情复盘")
 WIDTH, HEIGHT = 1080, 1920
 FPS = encode.FPS
 MARGIN = 72
-TRACK_TOP = 330
-TRACK_BOTTOM = 1790
+# 赛道上下都贴到极限：31 行摊下来每行不到 50px，省出来的每一点都是行高。
+TRACK_TOP = 260
+TRACK_BOTTOM = 1800
 # 名次平滑：每帧向目标位置靠拢的比例。太大像瞬移，太小追不上收盘排名。
 GLIDE = 0.3
 # 滑行收尾的帧数上限。正常十来帧就位，这里只是防止阈值取太严时空转。
 SETTLE_FRAMES = 30
 # 卡片高占行距的比例。留出的空隙决定了两行挨多近才会看着糊在一起。
 CARD_RATIO = 0.72
+# 卡片矮于此值就改走单行样式。
+#
+# 两行式（名称在上、色条在下）需要卡片高到能上下分层：色条从 0.62 高处起画，
+# 而名称字号有 24px 的下限（再小手机上读不清），卡片一矮于 56px 两者就必然
+# 相交。31 个行业摊下来卡片只有 35px，所以板块段整段走单行样式。
+COMPACT_CARD = 56
 # 标尺平滑：跟着当前峰值走但不逐帧跳变，否则整屏条形一直在抖。
 SCALE_GLIDE = 0.12
 # 条形的最小可见长度。数值太小时至少留一截，让人知道它存在而不是渲染坏了。
@@ -141,7 +148,7 @@ def _row_metrics(count: int) -> tuple[float, int]:
     """把可用高度摊给 ``count`` 行，返回（行距，卡片高）。
 
     卡片高按行距的固定比例取，而不是「行距减去固定间隙」：后者在行多的时候
-    （个股段 12 行）几乎把间隙吃光，两行只要挨近一点就糊成一片。
+    （板块段 31 行）几乎把间隙吃光，两行只要挨近一点就糊成一片。
     """
     span = (TRACK_BOTTOM - TRACK_TOP) / max(count, 1)
     card = int(min(104, span * CARD_RATIO))
@@ -189,6 +196,64 @@ def _bar_row(
         value_text,
         font=font,
         fill=color,
+    )
+
+
+def _slim_row(
+    draw: ImageDraw.ImageDraw,
+    y: float,
+    card: int,
+    name: str,
+    value_text: str,
+    ratio: float,
+    color: str,
+    soft: str,
+) -> None:
+    """单行样式：名称、色条、数值横向排开，三者共用一条基线。
+
+    行数多到卡片只剩三十几个像素时，两行式的名称与色条会直接压在一起。
+    这里把纵向分层改成横向分栏，代价是色条短了一截，换来的是每行都读得清。
+    """
+    top = int(y)
+    draw.rounded_rectangle(
+        (MARGIN, top, WIDTH - MARGIN, top + card), radius=int(card * 0.28),
+        fill=STAGE_PANEL,
+    )
+
+    size = max(20, int(card * 0.52))
+    font = load_font(size, bold=True)
+    # 字形基本落在字号高度内，居中就按字号算；再往上提一点点补视觉重心。
+    text_top = top + (card - size) // 2 - int(size * 0.12)
+
+    pad = 16
+    left, right = MARGIN + pad, WIDTH - MARGIN - pad
+    draw.text((left, text_top), name, font=font, fill=STAGE_INK)
+    draw.text(
+        (right - text_width(value_text, font), text_top),
+        value_text,
+        font=font,
+        fill=color,
+    )
+
+    # 两侧留固定列宽而不是按实测文字宽度让位：列宽一致，各行的色条才起止对齐，
+    # 长短才可比。申万一级行业名最长四个字（如「农林牧渔」），4.4 个字宽够用；
+    # 右侧数值最宽形如「-172.3亿」，给到 5.2 个字宽。
+    bar_left = left + int(size * 4.4)
+    bar_right = right - int(size * 5.2)
+    if bar_right <= bar_left:
+        return
+
+    height = max(8, int(card * 0.30))
+    bar_top = top + (card - height) // 2
+    bar_bottom = bar_top + height
+    radius = height // 2
+
+    draw.rounded_rectangle(
+        (bar_left, bar_top, bar_right, bar_bottom), radius=radius, fill=soft
+    )
+    span = max(MIN_BAR, int((bar_right - bar_left) * max(0.0, min(ratio, 1.0))))
+    draw.rounded_rectangle(
+        (bar_left, bar_top, bar_left + span, bar_bottom), radius=radius, fill=color
     )
 
 
@@ -278,6 +343,7 @@ def _race_frames(
         return
 
     span, card = _row_metrics(len(tracked))
+    paint = _bar_row if card >= COMPACT_CARD else _slim_row
     image = None
 
     for frame in layout(tracked):
@@ -290,7 +356,7 @@ def _race_frames(
         for index in sorted(range(len(tracked)), key=lambda i: frame.slots[i], reverse=True):
             value = frame.values[index]
             color, soft = _tone(value)
-            _bar_row(
+            paint(
                 draw,
                 TRACK_TOP + frame.slots[index] * span,
                 card,
@@ -393,8 +459,15 @@ def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
         bundle.date_text,
         seconds=2.4,
     )
+    # 标题里的行业数按**真正上场的**行业数写。上游少匹配上几个的时候，
+    # 写死 31 就成了画面上数得出来的错。
+    racing = sum(1 for row in bundle.sectors if row.get("series"))
     yield from _race_frames(
-        bundle.sectors, "钱流进了哪些行业", subtitle, hold_seconds=1.6
+        bundle.sectors,
+        f"{racing} 个行业资金赛跑",
+        f"{bundle.date_text} · 申万一级 · 主力资金当日累计净流入",
+        # 31 行比个股段多一倍还多，定格得给够读完的时间。
+        hold_seconds=2.5,
     )
     yield from _race_frames(
         bundle.stocks, "哪些个股在被抢筹", subtitle, hold_seconds=2.0
@@ -413,7 +486,7 @@ def build_social_title(bundle: MarketBundle) -> str:
             f"{top_out['name']}被砸{abs(top_out['net_inflow']) / 1e8:.0f}亿"
         )
     if top_in:
-        candidates.append(f"{top_in['name']}今日吸金{top_in['net_inflow'] / 1e8:.0f}亿")
+        candidates.append(f"{top_in['name']}吸金{top_in['net_inflow'] / 1e8:.0f}亿")
     candidates.append(f"{bundle.date_text} A股资金流向")
 
     for candidate in candidates:
@@ -428,7 +501,7 @@ def _flow_lines(rows: Sequence[dict]) -> list[str]:
 
 def build_note(bundle: MarketBundle) -> str:
     """笔记正文，不含标题与话题——这两样在小红书是独立输入框。"""
-    lines = [f"{bundle.date_text} A股主力资金流向。", ""]
+    lines = [f"📈 {bundle.date_text} A股主力资金流向。", ""]
 
     if bundle.indexes:
         lines.append(
@@ -439,19 +512,19 @@ def build_note(bundle: MarketBundle) -> str:
         )
         lines.append("")
 
-    for label, rows in (
-        ("资金流入最多的行业", bundle.sector_inflow),
-        ("资金流出最多的行业", bundle.sector_outflow),
-        ("被抢筹最多的个股", bundle.stock_inflow),
-        ("被抛售最多的个股", bundle.stock_outflow),
+    for emoji, label, rows in (
+        ("🔥", "资金流入最多的行业", bundle.sector_inflow),
+        ("💸", "资金流出最多的行业", bundle.sector_outflow),
+        ("🚀", "被抢筹最多的个股", bundle.stock_inflow),
+        ("📉", "被抛售最多的个股", bundle.stock_outflow),
     ):
         if not rows:
             continue
-        lines.append(label)
+        lines.append(f"{emoji} {label}")
         lines.extend(_flow_lines(rows))
         lines.append("")
 
-    lines.append("主力资金指特大单与大单的净额，数据来自公开行情接口。")
+    lines.append("⚠️ 主力资金指特大单与大单的净额，数据来自公开行情接口。")
     lines.append("仅作信息展示，不构成投资建议。")
     return "\n".join(lines).strip()
 

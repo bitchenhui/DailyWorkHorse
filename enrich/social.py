@@ -17,15 +17,19 @@ from core.models import Editorial, RepoItem
 TITLE_LIMIT = 20
 FALLBACK_TAGS = ("GitHub", "开源项目", "程序员", "编程", "开发者", "AI工具")
 
+# emoji 不必再禁：图片渲染前一律走 fonts.sanitize 剥掉，字形缺失画不出豆腐块，
+# 而复制到小红书的那份文本里它们原样保留——两边各取所需。
 SYSTEM_PROMPT = (
     "你为一份面向中文开发者的 GitHub 每日榜单撰写小红书文案。\n"
+    "语气按小红书来：像跟朋友分享，短句、说人话、有具体信息，不端着也不浮夸。\n"
     "要求：\n"
     f"1. titles：3 个标题候选，每个 10–{TITLE_LIMIT} 个字（含标点与 emoji），"
     f"必须是完整通顺的短句，宁可写短也不要写满 {TITLE_LIMIT} 字后被截断。"
     "要有具体信息量的钩子，可点出榜上最突出的项目或趋势；"
-    "不要「震惊」「绝了」「速看」这类标题党用语；"
-    "标题会被渲染进图片，不要使用 emoji 或特殊符号\n"
-    "2. lede：导语 40–60 字，说明这份榜单是什么、这一期值得看什么，口语但不浮夸\n"
+    "可以用一个 emoji 起头或收尾，但不要堆砌；"
+    "不要「震惊」「绝了」「速看」这类标题党用语\n"
+    "2. lede：导语 40–60 字，说明这份榜单是什么、这一期值得看什么，"
+    "口语但不浮夸，可穿插一两个 emoji\n"
     "3. tags：6–8 个话题标签，只写词本身不要 # 号，覆盖开源、编程语言、"
     "应用方向等维度，便于站内搜索\n"
     "4. 不得编造输入中不存在的事实\n"
@@ -114,8 +118,8 @@ def fallback(repos: list[RepoItem]) -> SocialCopy:
             f"过去一天最火的开源项目是 {top}"[:TITLE_LIMIT],
         ],
         lede=(
-            f"每天扒一遍 GitHub Trending，按近 24 小时新增 Star 排出前 {len(repos)} 名。"
-            "图里有每个项目是什么、为什么突然涨，两分钟看完最新的开源风向。"
+            f"✨ 每天扒一遍 GitHub Trending，按近 24 小时新增 Star 排出前 {len(repos)} 名。"
+            "图里有每个项目是什么、为什么突然涨，两分钟看完最新的开源风向 🚀"
         ),
         tags=list(FALLBACK_TAGS) + languages[:2],
     )

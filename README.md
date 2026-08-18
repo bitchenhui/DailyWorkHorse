@@ -4,7 +4,7 @@
 
 | 定时（北京时间） | 信息源 | 内容 | 去哪儿 |
 |------------------|--------|------|--------|
-| **08:30** | GitHub Trending | 前一天日增 stars Top10 + 大模型中文摘要与前三深度解读 | 微信公众号长图文、小红书图卡 |
+| **08:00** | GitHub Trending | 近 24 小时新增 stars Top10 + 大模型中文摘要与前三深度解读 | 微信公众号长图文、小红书图卡 |
 | **15:10** | A 股主力资金流 | 25 秒竖屏视频：行业与个股的资金赛跑 | 小红书视频笔记 |
 
 > 行情为什么排在下午：视频画的是**当日**分钟级资金流曲线，必须等 A 股 15:00
@@ -127,6 +127,17 @@ A 股资金流视频（1080×1920，约 25 秒）：
 | `LLM_API_BASE` | API Base URL（不要末尾多余路径以外的 `/chat/completions`） |
 | `LLM_MODEL` | 模型名 |
 
+想让每趟 Actions 跑完发一封邮件通知（附各平台成稿链接），再加：
+
+| Name | 说明 |
+|------|------|
+| `MAIL_CONNECTION` | 形如 `smtp://账号:授权码@smtp.qq.com:465`。QQ 与 163 邮箱要用**授权码**，不是登录密码 |
+| `MAIL_TO` | 收件地址，多个用逗号分隔 |
+| `MAIL_FROM` | 可选。多数邮箱要求发件地址与认证账号一致；留空则用 `MAIL_TO`，只发给自己时够用 |
+
+不配 `MAIL_CONNECTION` 就不发邮件，工作流照常跑完。邮件在失败时也会发——
+跑挂了才最需要知道，所以主题会写明这趟是就绪、空跑还是失败。
+
 可选的仓库 **Variables**（Settings → Secrets and variables → Actions → Variables）：
 
 | Name | 说明 |
@@ -151,7 +162,7 @@ A 股资金流视频（1080×1920，约 25 秒）：
 
 | 工作流 | 定时（UTC） | 北京时间 | 平台 |
 |--------|-------------|----------|------|
-| `GitHub Trending` | `30 0 * * *` | 08:30 | `wechat_mp,xhs` |
+| `GitHub Trending` | `0 0 * * *` | 08:00 | `wechat_mp,xhs` |
 | `Market Flow` | `10 7 * * *` | 15:10 | `xhs_video` |
 
 两者都调用同一个可复用工作流 `publish.yml`，装环境、跑测试、取回站点、生成、
@@ -228,7 +239,7 @@ requirements.txt
 .env.example
 .github/workflows/
   publish.yml                # 可复用：装环境 → 测试 → 取回站点 → 生成 → 推分支
-  github-trending.yml        # 08:30 触发，平台 wechat_mp,xhs
+  github-trending.yml        # 08:00 触发，平台 wechat_mp,xhs
   market.yml                 # 15:10 触发，平台 xhs_video
 tests/
 ```

@@ -206,11 +206,12 @@ def build_publish_page(
     }}
     async function copyRich() {{
       const article = document.getElementById("rich");
+      const wrapped = `<!DOCTYPE html><html><body>${{article.innerHTML}}</body></html>`;
       try {{
         if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {{
           await navigator.clipboard.write([new ClipboardItem({{
-            "text/html": new Blob([article.innerHTML], {{type:"text/html"}}),
-            "text/plain": new Blob([article.innerText], {{type:"text/plain"}})
+            "text/html": new Blob([wrapped], {{type:"text/html;charset=utf-8"}}),
+            "text/plain": new Blob([article.innerText], {{type:"text/plain;charset=utf-8"}})
           }})]);
         }} else {{
           const range = document.createRange();
@@ -221,7 +222,7 @@ def build_publish_page(
           document.execCommand("copy");
           selection.removeAllRanges();
         }}
-        toast("已复制，可粘贴到编辑器");
+        toast("已复制，可粘贴到公众号编辑器");
       }} catch (error) {{
         toast("复制失败，请手动选择正文");
       }}

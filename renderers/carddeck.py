@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw
 from core.models import ContentBundle, RepoItem
 from renderers.base import CopyField, ImageAsset, RenderResult
 from renderers.fonts import fit_font_size, load_font, sanitize, text_width, wrap
-from renderers.format import fmt_count, fmt_delta
+from renderers.format import fmt_count, fmt_delta, fmt_delta_num
 from renderers.theme import (
     ACCENT,
     ACCENT_SOFT,
@@ -22,6 +22,7 @@ from renderers.theme import (
     INK,
     MUTED,
     PAPER,
+    STAR_GOLD,
     SURFACE,
 )
 
@@ -98,6 +99,51 @@ def _pill(
     draw.text((left + pad_x, top + pad_y - 2), text, font=font, fill=color)
 
 
+def _draw_delta(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[int, int],
+    stars: int,
+    font,
+    num_color: str = ACCENT,
+    star_color: str = STAR_GOLD,
+) -> int:
+    """数字与星标分色绘制，返回占用宽度。"""
+    x, y = xy
+    num = fmt_delta_num(stars)
+    draw.text((x, y), num, font=font, fill=num_color)
+    x += int(text_width(num, font))
+    draw.text((x, y), "★", font=font, fill=star_color)
+    return int(text_width(num + "★", font))
+
+
+def _pill_delta(
+    draw: ImageDraw.ImageDraw,
+    right: int,
+    top: int,
+    stars: int,
+    suffix: str,
+    font,
+    background: str,
+    num_color: str = ACCENT,
+) -> None:
+    """带金色星标的右对齐标签，如 ``+1.9k★ 近24h``。"""
+    pad_x, pad_y = 22, 12
+    num = fmt_delta_num(stars)
+    width = int(text_width(num + "★" + suffix, font)) + pad_x * 2
+    height = font.size + pad_y * 2
+    left = right - width
+    draw.rounded_rectangle(
+        (left, top, right, top + height), radius=height / 2, fill=background
+    )
+    x = left + pad_x
+    y = top + pad_y - 2
+    draw.text((x, y), num, font=font, fill=num_color)
+    x += int(text_width(num, font))
+    draw.text((x, y), "★", font=font, fill=STAR_GOLD)
+    x += int(text_width("★", font))
+    draw.text((x, y), suffix, font=font, fill=num_color)
+
+
 def _spaced(text: str) -> str:
     return " ".join(text)
 
@@ -146,13 +192,15 @@ def _cover_card(bundle: ContentBundle) -> Image.Image:
     row_y = rule_y + 52
     for repo in preview:
         draw.text((MARGIN, row_y + 6), f"{repo['rank']:02d}", font=rank_font, fill=ACCENT)
-        delta = fmt_delta(repo["stars_today"])
-        delta_width = text_width(delta, delta_font)
-        draw.text(
+        delta_font = load_font(30, bold=True)
+        delta_width = int(text_width(fmt_delta_num(repo["stars_today"]) + "★", delta_font))
+        _draw_delta(
+            draw,
             (WIDTH - MARGIN - delta_width, row_y + 4),
-            delta,
-            font=delta_font,
-            fill=COVER_HIGHLIGHT,
+            repo["stars_today"],
+            delta_font,
+            num_color=COVER_HIGHLIGHT,
+            star_color=STAR_GOLD,
         )
         name = repo["full_name"].split("/")[-1]
         name_font = fit_font_size(
@@ -222,24 +270,25 @@ def _detail_card(bundle: ContentBundle, repo: RepoItem) -> Image.Image:
         font=load_font(26, bold=True),
         fill=MUTED,
     )
-    _pill(
+    _pill_delta(
         draw,
         WIDTH - inner_x,
         card_top + 60,
-        f"{fmt_delta(repo['stars_today'])} 近24h",
+        repo["stars_today"],
+        " 近24h",
         load_font(28, bold=True),
         ACCENT_SOFT,
-        ACCENT,
     )
 
     y = card_top + DETAIL_TOP_PAD
     y = _draw_lines(draw, (inner_x, y), name_lines, name_font, INK, name_lh)
-    draw.text(
-        (inner_x, y + 12),
-        f"{repo['language']} · 累计 {fmt_count(repo['stars_total'])}★",
-        font=load_font(28),
-        fill=MUTED,
-    )
+    meta_font = load_font(28)
+    meta_y = y + 12
+    draw.text((inner_x, meta_y), f"{repo['language']} · 累计 ", font=meta_font, fill=MUTED)
+    meta_x = inner_x + int(text_width(f"{repo['language']} · 累计 ", meta_font))
+    draw.text((meta_x, meta_y), fmt_count(repo["stars_total"]), font=meta_font, fill=MUTED)
+    meta_x += int(text_width(fmt_count(repo["stars_total"]), meta_font))
+    draw.text((meta_x, meta_y), "★", font=meta_font, fill=STAR_GOLD)
     y += meta_block
 
     y = _draw_lines(
@@ -300,13 +349,12 @@ def _list_card(
         inner_x = 104
 
         draw.text((inner_x, y + 44), f"{repo['rank']:02d}", font=rank_font, fill=ACCENT)
-        delta = fmt_delta(repo["stars_today"])
-        delta_width = text_width(delta, delta_font)
-        draw.text(
+        delta_width = int(text_width(fmt_delta_num(repo["stars_today"]) + "★", delta_font))
+        _draw_delta(
+            draw,
             (WIDTH - inner_x - delta_width, y + 42),
-            delta,
-            font=delta_font,
-            fill=ACCENT,
+            repo["stars_today"],
+            delta_font,
         )
 
         name_font = fit_font_size(
@@ -334,6 +382,16 @@ def build_note(bundle: ContentBundle) -> str:
     return "\n".join(parts).strip() + "\n"
 
 
+def _rank_mark(rank: int) -> str:
+    """前三名给奖牌，其余给统一的小标记。
+
+    这些 emoji 只出现在复制到小红书的文本里——图卡渲染前会被 ``sanitize``
+    剥掉，所以不必担心字形缺失画出豆腐块。
+    """
+    marks = ("🥇", "🥈", "🥉")
+    return marks[rank - 1] if 1 <= rank <= len(marks) else "🔹"
+
+
 def build_note_body(bundle: ContentBundle) -> str:
     """笔记正文，不含标题与话题——这两样在小红书是独立输入框。
 
@@ -345,14 +403,14 @@ def build_note_body(bundle: ContentBundle) -> str:
 
     for repo in bundle.repos:
         lines.append(
-            f"{repo['rank']:02d}｜{repo['full_name']}  "
+            f"{_rank_mark(repo['rank'])} {repo['rank']:02d}｜{repo['full_name']}  "
             f"{fmt_delta(repo['stars_today'])}"
         )
         lines.append(bundle.summary_for(repo))
         lines.append("")
 
     lines.append(
-        "数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。"
+        "📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。"
     )
     return "\n".join(lines).strip()
 

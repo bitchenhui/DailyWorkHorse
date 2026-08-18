@@ -13,5 +13,10 @@ def fmt_count(n: int) -> str:
     return str(n)
 
 
+def fmt_delta_num(n: int) -> str:
+    """不带星标的增量数字，便于分色渲染。"""
+    return f"+{fmt_count(n)}"
+
+
 def fmt_delta(n: int) -> str:
-    return f"+{fmt_count(n)}★"
+    return f"{fmt_delta_num(n)}★"

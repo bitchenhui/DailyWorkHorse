@@ -95,3 +95,35 @@ jobs:
           git push -q --force \
             "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:gh-pages
           echo "站点内容：$(ls | tr '\n' ' ')"
+
+      # 跑挂了才最需要收到信，所以整段都挂 always()。
+      # 先垫一份兜底正文再让 Python 覆盖：装依赖或采集阶段就断掉时，
+      # tools.mailreport 自己也跑不起来，兜底那份得留住。
+      - name: Compose the run report
+        id: report
+        if: always()
+        continue-on-error: true
+        env:
+          MAIL_CONNECTION: ${{ secrets.MAIL_CONNECTION }}
+          PUBLIC_DRAFT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          echo "<p>本次运行没能生成报告，请直接看运行日志。</p>" > run-report.html
+          # 这行必须排在 python 之前：它失败时也得让发信步骤知道该不该发。
+          if [ -n "${MAIL_CONNECTION}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "未配置 MAIL_CONNECTION，跳过邮件通知"
+          fi
+          python -m tools.mailreport
+
+      - name: Send the run report
+        if: always() && steps.report.outputs.configured == 'true'
+        uses: dawidd6/action-send-mail@v18
+        with:
+          connection_url: ${{ secrets.MAIL_CONNECTION }}
+          # 多数邮箱要求发件地址与认证账号一致；只发给自己时省一个 secret。
+          from: daily-brief <${{ secrets.MAIL_FROM || secrets.MAIL_TO }}>
+          to: ${{ secrets.MAIL_TO }}
+          subject: ${{ steps.report.outputs.subject || format('daily-brief · {0} 运行报告', inputs.platforms) }}
+          html_body: file://run-report.html

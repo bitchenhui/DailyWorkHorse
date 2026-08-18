@@ -8,7 +8,7 @@ from datetime import datetime
 from html import escape as _esc
 from typing import Callable
 
-from channels import pushplus
+from channels import pushplus, report
 from channels.base import Channel, DeliveryResult
 from channels.bundle import BundleChannel
 from channels.overview import write_overview
@@ -186,6 +186,24 @@ def _draft_link_card(draft_url: str) -> str:
 def run(dry_run: bool = False) -> int:
     outcome = distribute()
     results = outcome.results
+
+    # 先落运行记录再判成败。收尾邮件在失败时也要发，而「哪个信息源没出内容、
+    # 为什么」正是那封邮件唯一有价值的部分；写在 raise 之后就永远写不到。
+    report.write_record(
+        DIST_DIR,
+        outcome.date_text,
+        [
+            {
+                "platform": item.platform,
+                "label": item.platform_label,
+                "title": item.title,
+            }
+            for item in results
+        ],
+        outcome.idle,
+        outcome.failed,
+    )
+
     if not results:
         if outcome.failed:
             raise RuntimeError("信息源全部失败：" + "；".join(outcome.failed))

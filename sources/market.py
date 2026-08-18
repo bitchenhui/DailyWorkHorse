@@ -353,11 +353,16 @@ def _attach_series(
     return day, last
 
 
-def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
+def fetch(stock_top: int = 6) -> dict[str, object]:
     """采集一期视频所需的全部资金流数据。
 
-    默认条数对着竖屏画面定：板块段 5+5 行、个股段 6+6 行，再多就得压缩字号。
-    请求量约 ``10 + 2*(sector_top + stock_top)``，默认 32 个，几秒钟跑完。
+    行业**不做截断**：视频的板块段要让 31 个申万一级行业同场赛跑，缺哪个都
+    会让「钱从哪流到哪」缺一块。封面与文案只取两端，那是 ``MarketBundle``
+    的属性负责切的事，与采集无关。
+
+    个股反过来必须截断：全 A 五千多只跑不动，各取榜首 ``stock_top`` 只。
+
+    请求量约 ``10 + 31 + 2*stock_top``，默认 53 个，十几秒跑完。
     """
     client = session()
 
@@ -367,14 +372,11 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
         safe_print(f"  {index['name']} {index['price']} ({index['change_pct']:+.2f}%)")
 
     safe_print("抓取行业板块资金流排名 …")
-    # 一次取全再切两端：既省一次请求，也保证两端来自同一张排序表。
     sectors = fetch_sectors(client)
-    sector_inflow = sectors[:sector_top]
-    sector_outflow = sectors[: -sector_top - 1 : -1]
     safe_print(f"  匹配到 {len(sectors)} 个申万一级行业")
-    for sector in sector_inflow[:3]:
+    for sector in sectors[:3]:
         safe_print(f"  流入 {sector['name']} {sector['net_inflow'] / 1e8:+.2f} 亿")
-    for sector in sector_outflow[:3]:
+    for sector in sectors[:-4:-1]:
         safe_print(f"  流出 {sector['name']} {sector['net_inflow'] / 1e8:+.2f} 亿")
 
     safe_print("抓取个股资金流排名 …")
@@ -385,8 +387,7 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
     day = ""
     last = ""
     for items, secid_of, label in (
-        (sector_inflow, sector_secid, "板块流入"),
-        (sector_outflow, sector_secid, "板块流出"),
+        (sectors, sector_secid, "行业板块"),
         (stock_inflow, stock_secid, "个股流入"),
         (stock_outflow, stock_secid, "个股流出"),
     ):
@@ -398,8 +399,7 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
         "trading_date": day,
         "last_clock": last,
         "indexes": indexes,
-        "sector_inflow": sector_inflow,
-        "sector_outflow": sector_outflow,
+        "sectors": sectors,
         "stock_inflow": stock_inflow,
         "stock_outflow": stock_outflow,
     }
@@ -442,7 +442,7 @@ class MarketDataLagging(RuntimeError):
     """
 
 
-def build_bundle(sector_top: int = 5, stock_top: int = 6) -> MarketBundle:
+def build_bundle(stock_top: int = 6) -> MarketBundle:
     """采集并装配成管线用的 ``MarketBundle``。
 
     宁可少发一期，也不发一期错的，所以数据不合格一律抛错。抛哪一种要看
@@ -454,7 +454,7 @@ def build_bundle(sector_top: int = 5, stock_top: int = 6) -> MarketBundle:
       这一天本该出片，静默跳过就成了「漏发一期还没人知道」。
     """
     date_text = datetime.now(CST).strftime("%Y-%m-%d")
-    data = fetch(sector_top, stock_top)
+    data = fetch(stock_top)
 
     # 先查日期：非交易日拿到的是上一交易日的**完整**曲线，
     # 时刻校验会放行，只有日期能识破。
@@ -471,15 +471,14 @@ def build_bundle(sector_top: int = 5, stock_top: int = 6) -> MarketBundle:
             raise MarketDataLagging(f"{detail}；此刻早已过 {DATA_DEADLINE}，上游滞后")
         raise SessionNotClosed(detail)
 
-    sector_inflow: list[Sector] = data["sector_inflow"]  # type: ignore[assignment]
+    sectors: list[Sector] = data["sectors"]  # type: ignore[assignment]
 
     return MarketBundle(
         slug=f"{date_text}-market-flow",
         date_text=date_text,
-        title=build_title(date_text, sector_inflow),
+        title=build_title(date_text, sectors),
         indexes=data["indexes"],  # type: ignore[arg-type]
-        sector_inflow=sector_inflow,
-        sector_outflow=data["sector_outflow"],  # type: ignore[arg-type]
+        sectors=sectors,
         stock_inflow=data["stock_inflow"],  # type: ignore[arg-type]
         stock_outflow=data["stock_outflow"],  # type: ignore[arg-type]
     )

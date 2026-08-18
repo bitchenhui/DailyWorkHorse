@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pipeline
 from renderers.base import CopyField, RenderResult
@@ -125,11 +127,17 @@ class IdleVsBrokenTests(unittest.TestCase):
     def setUp(self) -> None:
         self.feeds = pipeline.FEEDS
         self.platforms = pipeline.enabled_platforms
+        self.dist = pipeline.DIST_DIR
         pipeline.enabled_platforms = lambda: ("xhs_video",)
+        # run() 会落一份运行记录，别让它写进真实的 dist/。
+        self.tmp = TemporaryDirectory()
+        pipeline.DIST_DIR = Path(self.tmp.name)
 
     def tearDown(self) -> None:
         pipeline.FEEDS = self.feeds
         pipeline.enabled_platforms = self.platforms
+        pipeline.DIST_DIR = self.dist
+        self.tmp.cleanup()
 
     def _market_feed(self, error: Exception) -> None:
         def build():

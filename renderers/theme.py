@@ -20,6 +20,8 @@ RISE = "#f04a4a"
 RISE_SOFT = "#3a1f24"
 FALL = "#12a05f"
 FALL_SOFT = "#152e26"
+# 图卡与公众号正文里的星标色。Pillow 画不出 emoji 星，用字形 ★ 着金色。
+STAR_GOLD = "#f5a623"
 
 FONT = (
     "-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',"
