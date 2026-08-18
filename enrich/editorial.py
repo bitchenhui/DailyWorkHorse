@@ -70,7 +70,7 @@ def _fallback_summary(repo: RepoItem) -> str:
     desc = " ".join((repo.get("description") or "").split())
     if desc:
         return desc[:48] + ("…" if len(desc) > 48 else "")
-    return f"{repo.get('full_name', '未知仓库')} 今日新增关注"
+    return f"{repo.get('full_name', '未知仓库')} 近期新增关注"
 
 
 def _build_user_prompt(repos: list[RepoItem]) -> str:
@@ -85,7 +85,10 @@ def _build_user_prompt(repos: list[RepoItem]) -> str:
         }
         for r in repos
     ]
-    return "今日榜单数据：\n" + json.dumps(payload, ensure_ascii=False, indent=2)
+    return (
+        "榜单数据（stars_today 为近 24 小时新增星标，非自然日）：\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+    )
 
 
 def generate(repos: list[RepoItem]) -> dict[int, Editorial]:

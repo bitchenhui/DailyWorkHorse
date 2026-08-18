@@ -60,8 +60,9 @@ dist/
 图卡自动排版：封面含 Top5 预告，前三名各一张详情卡，第 4–10 名两张列表卡。
 中文字体没有 emoji 字形，渲染时会自动剥离表情符号，避免出现豆腐块。
 
-Actions 的 `drafts-*` Artifact 保存每期完整素材 30 天；GitHub Pages 由
-`gh-pages` 分支提供，展示各信息源各自最新的一期。
+Actions 的 `drafts-*` Artifact 保存每期完整素材 **7 天**，到期 GitHub 自动删。
+GitHub Pages 由 `gh-pages` 分支提供，只放各信息源各自最新的一期——该分支每次
+以单提交强推，不累积历史，仓库体积因此保持恒定。
 
 ## 内容长什么样
 

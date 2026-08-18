@@ -22,10 +22,10 @@ SYSTEM_PROMPT = (
     "要求：\n"
     f"1. titles：3 个标题候选，每个 10–{TITLE_LIMIT} 个字（含标点与 emoji），"
     f"必须是完整通顺的短句，宁可写短也不要写满 {TITLE_LIMIT} 字后被截断。"
-    "要有具体信息量的钩子，可点出当日最突出的项目或趋势；"
+    "要有具体信息量的钩子，可点出榜上最突出的项目或趋势；"
     "不要「震惊」「绝了」「速看」这类标题党用语；"
     "标题会被渲染进图片，不要使用 emoji 或特殊符号\n"
-    "2. lede：导语 40–60 字，说明这份榜单是什么、今天值得看什么，口语但不浮夸\n"
+    "2. lede：导语 40–60 字，说明这份榜单是什么、这一期值得看什么，口语但不浮夸\n"
     "3. tags：6–8 个话题标签，只写词本身不要 # 号，覆盖开源、编程语言、"
     "应用方向等维度，便于站内搜索\n"
     "4. 不得编造输入中不存在的事实\n"
@@ -54,7 +54,12 @@ def _build_user_prompt(
         }
         for r in repos[:5]
     ]
-    return "今日榜单前五：\n" + json.dumps(payload, ensure_ascii=False, indent=2)
+    # stars_today 是东家的字段名，但含义是近 24 小时增量，给模型讲清楚，
+    # 免得它照着字面写出「今天涨了 xxx」这种不准的文案。
+    return (
+        "榜单前五（stars_today 为近 24 小时新增星标）：\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+    )
 
 
 TITLE_MIN = 8
@@ -105,12 +110,12 @@ def fallback(repos: list[RepoItem]) -> SocialCopy:
             languages.append(lang)
     return SocialCopy(
         titles=[
-            f"今日 GitHub 涨最快的 {len(repos)} 个项目"[:TITLE_LIMIT],
-            f"今天最火的开源项目是 {top}"[:TITLE_LIMIT],
+            "近 24h GitHub 涨最快的项目"[:TITLE_LIMIT],
+            f"过去一天最火的开源项目是 {top}"[:TITLE_LIMIT],
         ],
         lede=(
-            f"每天扒一遍 GitHub Trending，按当日新增 Star 排出前 {len(repos)} 名。"
-            "图里有每个项目是什么、为什么突然涨，两分钟看完今天的开源风向。"
+            f"每天扒一遍 GitHub Trending，按近 24 小时新增 Star 排出前 {len(repos)} 名。"
+            "图里有每个项目是什么、为什么突然涨，两分钟看完最新的开源风向。"
         ),
         tags=list(FALLBACK_TAGS) + languages[:2],
     )

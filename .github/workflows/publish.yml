@@ -72,7 +72,9 @@ jobs:
           path: |
             dist/
             !dist/.git
-          retention-days: 30
+          # 到期 GitHub 自动删，不必另跑清理任务。站点上永远只有各信息源
+          # 最新的一期，真正会无限长的只有 Artifact。
+          retention-days: 7
 
       - name: Publish to gh-pages
         env:
@@ -81,13 +83,15 @@ jobs:
           cd dist
           # Pages 默认会跑 Jekyll，下划线开头的文件会被吞掉。
           touch .nojekyll
+          # 丢掉历史、重建成单提交再强推。gh-pages 装的是图片和视频，
+          # 按天累积提交会让仓库体积只涨不跌，而这些产物的历史版本没人回看
+          # ——真要回溯有 Artifact。分支只是发布载体，源码在 main 上。
+          rm -rf .git
+          git init -q -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --quiet --cached; then
-            echo "内容无变化，不推送"
-            exit 0
-          fi
           git commit -q -m "${{ inputs.platforms }} @ $(date -u +%FT%TZ)"
-          git push -q \
+          git push -q --force \
             "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:gh-pages
+          echo "站点内容：$(ls | tr '\n' ' ')"

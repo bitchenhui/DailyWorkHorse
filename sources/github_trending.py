@@ -1,4 +1,17 @@
-"""GitHub Trending 采集：聚合综合榜与主流语言榜，按今日新增 stars 重排。"""
+"""GitHub Trending 采集：聚合综合榜与主流语言榜，按新增 stars 重排。
+
+关于口径，两点容易想当然：
+
+页面上写的是「N stars today」，但那不是自然日切片，而是**抓取时刻往前回溯
+约 24 小时**的滚动窗口。实测 UTC 03:43 时榜首显示 1189，若口径是「UTC 零点
+以来」则不可能在 3.7 小时里积累到这个量。所以对外文案一律说「近 24 小时」，
+不说「今日」。
+
+另外 GitHub 自家的排序并不等于按 stars today 降序（实测见过 120 排在 207
+前面），它掺了增长加速度之类的因素。这里统一按 stars today 重排，得到的是
+**候选池内**的 TopN——候选池是综合榜加下面这几个语言榜，冷门语言若没能挤进
+综合榜就会漏掉。
+"""
 
 from __future__ import annotations
 
@@ -82,7 +95,7 @@ def parse_trending_html(html: str) -> list[dict[str, Any]]:
 def merge_rank_repos(
     repos: list[dict[str, Any]], limit: int = 10
 ) -> list[dict[str, Any]]:
-    """按仓库去重，并按日增 stars、总 stars 降序取 TopN。"""
+    """按仓库去重，并按近 24h 新增 stars、总 stars 降序取 TopN。"""
     unique: dict[str, dict[str, Any]] = {}
     for repo in repos:
         name = str(repo.get("full_name") or "").lower()
@@ -140,7 +153,7 @@ def _fetch_page(url: str, retries: int = 3) -> list[dict[str, Any]]:
 
 
 def fetch(limit: int = 10) -> list[RepoItem]:
-    """聚合综合榜和主流语言榜，按日增 stars 严格降序取 TopN。
+    """聚合综合榜和主流语言榜，按近 24h 新增 stars 严格降序取 TopN。
 
     GitHub 综合 Trending 有时少于 10 条。语言榜用于扩大候选池，不改变
     排序口径；最终仍统一按各卡片的 ``stars today`` 数值排名。

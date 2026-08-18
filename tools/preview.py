@@ -69,7 +69,7 @@ def build_sample_bundle() -> ContentBundle:
         repos=repos,
         editorial=editorial,
         alt_titles=["免费 API 合集稳坐榜首", "备选标题二", "备选标题三"],
-        lede="每天扒一遍 GitHub Trending，两分钟看完今天的开源风向。",
+        lede="每天扒一遍 GitHub Trending，两分钟看完最新的开源风向。",
         tags=["GitHub", "开源项目", "程序员", "AI"],
     )
 

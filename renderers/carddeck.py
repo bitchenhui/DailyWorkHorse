@@ -131,7 +131,7 @@ def _cover_card(bundle: ContentBundle) -> Image.Image:
 
     draw.text(
         (MARGIN, y + 24),
-        f"{bundle.date_text} · 按当日新增 Star 排名",
+        f"{bundle.date_text} · 按近 24 小时新增 Star 排名",
         font=load_font(30),
         fill=COVER_DIM,
     )
@@ -226,7 +226,7 @@ def _detail_card(bundle: ContentBundle, repo: RepoItem) -> Image.Image:
         draw,
         WIDTH - inner_x,
         card_top + 60,
-        f"{fmt_delta(repo['stars_today'])} 今日",
+        f"{fmt_delta(repo['stars_today'])} 近24h",
         load_font(28, bold=True),
         ACCENT_SOFT,
         ACCENT,
@@ -351,7 +351,9 @@ def build_note_body(bundle: ContentBundle) -> str:
         lines.append(bundle.summary_for(repo))
         lines.append("")
 
-    lines.append("数据来自 GitHub Trending 日榜，按当日新增 Star 排序，每天更新。")
+    lines.append(
+        "数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。"
+    )
     return "\n".join(lines).strip()
 
 

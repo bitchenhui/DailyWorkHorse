@@ -49,7 +49,7 @@ def _meta_row(r: RepoItem) -> str:
     return (
         f'<div style="margin:10px 0 0;font:500 12px/1.4 {MONO};color:{MUTED};">'
         f'<span style="display:inline-block;padding:3px 8px;border-radius:4px;'
-        f'background:{ACCENT_SOFT};color:{ACCENT};font-weight:600;">{delta} 今日</span>'
+        f'background:{ACCENT_SOFT};color:{ACCENT};font-weight:600;">{delta} 近24h</span>'
         f'<span style="margin-left:10px;">{lang}</span>'
         f'<span style="margin-left:10px;">累计 {total}★</span>'
         "</div>"
@@ -118,7 +118,8 @@ def _compact_row(r: RepoItem, editorial: Editorial | None, last: bool) -> str:
 
 
 def build_title(repos: list[RepoItem]) -> str:
-    return f"开源升温榜｜今日增长最快的 {len(repos)} 个 GitHub 项目"
+    # 不写「今日」：Trending 的窗口是抓取时刻回溯 24 小时，不是自然日切片。
+    return f"开源升温榜｜近 24 小时增长最快的 {len(repos)} 个 GitHub 项目"
 
 
 def _section(label: str, note: str = "") -> str:
@@ -145,9 +146,9 @@ def render_body(bundle: ContentBundle) -> str:
         f'<div style="margin:10px 0 0;font:600 22px/1.4 {FONT};color:#ffffff;">'
         f"开源升温榜</div>"
         f'<div style="margin:5px 0 0;font:400 15px/1.6 {FONT};color:#d9dce5;">'
-        f"今天，哪些 GitHub 项目正在快速获得关注？</div>"
+        f"过去一天，哪些 GitHub 项目正在快速获得关注？</div>"
         f'<div style="margin:12px 0 0;font:400 12px/1.7 {MONO};color:#9aa2b8;">'
-        f"{_esc(bundle.date_text)} · 最高日增 {_esc(fmt_delta(peak))} · "
+        f"{_esc(bundle.date_text)} · 近 24h 最高 {_esc(fmt_delta(peak))} · "
         f"{_esc(_lang_summary(repos))}"
         "</div></div>"
     )
@@ -176,7 +177,11 @@ def render_body(bundle: ContentBundle) -> str:
 
     parts.append(
         f'<div style="margin:24px 0 4px;font:400 12px/1.8 {FONT};color:{MUTED};">'
-        f"数据来自 GitHub Trending 日榜候选，按今日新增星标降序重排。<br>"
+        f"数据来自 GitHub Trending 日榜（综合榜 + 8 个主流语言榜），"
+        f"按各项目的新增星标降序重排。<br>"
+        f"口径说明：Trending 的「stars today」是抓取时刻往前回溯约 24 小时的"
+        f"滚动窗口，并非自然日切片；排名取自上述候选池，"
+        f"未覆盖的语言榜可能有遗漏。<br>"
         f'<a href="https://github.com/trending?since=daily" '
         f'style="color:{ACCENT};text-decoration:none;">查看源页 →</a>'
         "</div>"
@@ -225,7 +230,7 @@ def build_markdown(bundle: ContentBundle) -> str:
     lines = [
         f"# {bundle.title}",
         "",
-        f"> {bundle.date_text} · 按今日新增 Stars 降序",
+        f"> {bundle.date_text} · 按近 24 小时新增 Stars 降序",
         "",
     ]
     for repo in bundle.repos:
@@ -236,7 +241,7 @@ def build_markdown(bundle: ContentBundle) -> str:
             [
                 f"## {rank:02d}. [{repo['full_name']}]({repo['url']})",
                 (
-                    f"**+{repo['stars_today']}★ 今日** · {repo['language']} · "
+                    f"**+{repo['stars_today']}★ 近24h** · {repo['language']} · "
                     f"累计 {repo['stars_total']:,}★"
                 ),
                 "",

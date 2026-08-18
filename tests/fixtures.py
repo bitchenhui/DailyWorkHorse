@@ -32,7 +32,7 @@ def make_bundle(count: int = 10) -> ContentBundle:
     return ContentBundle(
         slug="2026-08-17-github-trending",
         date_text="2026-08-17",
-        title=f"开源升温榜｜今日增长最快的 {count} 个 GitHub 项目",
+        title=f"开源升温榜｜近 24 小时增长最快的 {count} 个 GitHub 项目",
         repos=repos,
         editorial={
             repo["rank"]: {
@@ -43,8 +43,8 @@ def make_bundle(count: int = 10) -> ContentBundle:
             }
             for repo in repos
         },
-        alt_titles=["今日 GitHub 涨最快的项目", "备选标题二"],
-        lede="每天扒一遍 GitHub Trending，两分钟看完今天的开源风向。",
+        alt_titles=["近 24h GitHub 涨最快的项目", "备选标题二"],
+        lede="每天扒一遍 GitHub Trending，两分钟看完最新的开源风向。",
         tags=["GitHub", "开源项目", "程序员"],
     )
 
