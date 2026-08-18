@@ -111,7 +111,7 @@ class StructureTests(unittest.TestCase):
         """
         bundle = make_market_bundle(minutes=2)
         seq = list(marketvideo.frames(bundle))
-        hold = int(2.8 * marketvideo.FPS)
+        hold = int(3.2 * marketvideo.FPS)
 
         tail = seq[-hold:]
         self.assertTrue(
@@ -124,10 +124,18 @@ class StructureTests(unittest.TestCase):
             "结论页与前一段之间没有切换",
         )
 
-    def test_stock_segment_reserves_room_for_the_recap_strip(self) -> None:
-        """个股段的赛道顶要给行业回顾带让位，不能顶到板块段那么高。"""
-        with_recap = marketvideo.TRACK_TOP + marketvideo.RECAP_HEIGHT + 40
-        self.assertGreater(with_recap, marketvideo.TRACK_TOP)
+    def test_closing_page_shows_the_stock_top3(self) -> None:
+        """个股不再单独走赛跑，最终前三收在结论页——改榜首名字，成片必须变。
+
+        个股段被删掉后，个股数据只剩这一处出口；这条断言守住它别再悄悄丢掉。
+        """
+        bundle = make_market_bundle(minutes=2)
+        before = next(iter(marketvideo._closing_frames(bundle, seconds=0.1))).tobytes()
+
+        bundle.stock_inflow[0]["name"] = "关灯吃面科技"
+        after = next(iter(marketvideo._closing_frames(bundle, seconds=0.1))).tobytes()
+
+        self.assertNotEqual(before, after, "结论页没有把个股榜首画上去")
 
 
 class EncodeTests(unittest.TestCase):
