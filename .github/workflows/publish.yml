@@ -132,8 +132,8 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          from: daily-brief <${{ secrets.MAIL_FROM || secrets.MAIL_USERNAME }}>
+          from: DailyWorkHorse <${{ secrets.MAIL_FROM || secrets.MAIL_USERNAME }}>
           to: ${{ secrets.MAIL_TO }}
-          subject: ${{ steps.report.outputs.subject || format('daily-brief · {0} 运行报告', inputs.platforms) }}
+          subject: ${{ steps.report.outputs.subject || format('DailyWorkHorse · {0} 运行报告', inputs.platforms) }}
           html_body: file://run-report.html
           ignore_cert: true

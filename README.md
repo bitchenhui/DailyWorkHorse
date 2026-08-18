@@ -1,4 +1,4 @@
-# daily-brief
+# DailyWorkHorse
 
 两个信息源各有各的定时任务，各自产出成稿并经 **PushPlus** 推一条微信通知：
 

@@ -8,8 +8,8 @@ from tempfile import TemporaryDirectory
 
 from channels import report
 
-DRAFT = "https://example.github.io/daily-brief/"
-RUN = "https://github.com/me/daily-brief/actions/runs/1"
+DRAFT = "https://example.github.io/DailyWorkHorse/"
+RUN = "https://github.com/me/DailyWorkHorse/actions/runs/1"
 
 
 class RecordTests(unittest.TestCase):

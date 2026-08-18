@@ -62,9 +62,9 @@ def _platform_url(draft_url: str, platform: str) -> str:
 def subject_for(record: dict | None) -> str:
     """主题一眼说清这趟的结论，正文才有人点开。"""
     if record is None:
-        return "daily-brief · 生成失败"
+        return "DailyWorkHorse · 生成失败"
 
-    prefix = f"daily-brief {record.get('date') or ''}".strip()
+    prefix = f"DailyWorkHorse {record.get('date') or ''}".strip()
     platforms = record.get("platforms") or []
     failed = record.get("failed") or []
 
