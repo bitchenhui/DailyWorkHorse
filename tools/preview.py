@@ -5,6 +5,10 @@
 排版一旦在某个极端下崩掉，这里就能看出来。
 
     python -m tools.preview [输出目录]
+
+默认跳过行情视频——渲染整段要十几秒，而调图卡排版时用不上它：
+
+    python -m tools.preview --with-video
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from pathlib import Path
 from channels.bundle import BundleChannel
 from channels.overview import write_overview
 from core.models import ContentBundle
-from renderers import article, carddeck
+from renderers import article, carddeck, marketvideo
 
 _LONG_SUMMARY = (
     "一个用于压力测试排版的超长中文摘要，包含 English words 与 1234 数字，"
@@ -71,19 +75,30 @@ def build_sample_bundle() -> ContentBundle:
 
 
 def main() -> int:
-    output = Path(sys.argv[1] if len(sys.argv) > 1 else "dist-preview").resolve()
-    bundle = build_sample_bundle()
+    args = [arg for arg in sys.argv[1:] if arg != "--with-video"]
+    with_video = "--with-video" in sys.argv
+    output = Path(args[0] if args else "dist-preview").resolve()
 
+    bundle = build_sample_bundle()
     channel = BundleChannel(output)
     channel.preflight()
-    results = []
+
     for render in (article.render, carddeck.render):
         result = render(bundle)
         delivered = channel.deliver(bundle, result)
         print(f"  {result.platform_label}: {delivered.detail}")
-        results.append(result)
 
-    write_overview(output, bundle, results)
+    if with_video:
+        # 行情夹具住在 tests 里：它同样是一份刻意设计的边界数据
+        # （末段名次反超），没必要为预览再维护第二份。
+        from tests.fixtures import make_market_bundle
+
+        market = make_market_bundle(minutes=60)
+        result = marketvideo.render(market)
+        delivered = channel.deliver(market, result)
+        print(f"  {result.platform_label}: {delivered.detail}")
+
+    write_overview(output)
     print(f"预览已生成: {output / 'index.html'}")
     return 0
 

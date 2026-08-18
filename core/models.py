@@ -31,6 +31,41 @@ class Editorial(TypedDict):
     who: str
 
 
+class FlowPoint(TypedDict):
+    """资金流分钟序列上的一个点。``net_inflow`` 是**当日累计**净流入（元）。"""
+
+    time: str
+    net_inflow: float
+
+
+class IndexQuote(TypedDict):
+    code: str
+    name: str
+    price: float
+    change_pct: float
+
+
+class Sector(TypedDict):
+    """行业板块的当日资金流。``series`` 为空表示曲线没取到。"""
+
+    code: str
+    name: str
+    change_pct: float
+    net_inflow: float
+    net_ratio: float
+    series: list[FlowPoint]
+
+
+class Stock(TypedDict):
+    code: str
+    name: str
+    price: float
+    change_pct: float
+    net_inflow: float
+    net_ratio: float
+    series: list[FlowPoint]
+
+
 EMPTY_EDITORIAL: Editorial = {"summary": "", "what": "", "why": "", "who": ""}
 
 
@@ -73,6 +108,30 @@ class ContentBundle(Bundle):
     def social_title(self) -> str:
         """社交平台优先用钩子式标题，缺失时退回公众号主标题。"""
         return self.alt_titles[0] if self.alt_titles else self.title
+
+
+@dataclass
+class MarketBundle(Bundle):
+    """行情日报的领域数据：指数快照，以及资金流的两端。
+
+    流入与流出分开存而不是合成一张榜，是因为它们是两次不同的排序请求，
+    合并后再想还原「哪些是榜首、哪些是榜尾」反而要重新判断。
+    """
+
+    indexes: list[IndexQuote] = field(default_factory=list)
+    sector_inflow: list[Sector] = field(default_factory=list)
+    sector_outflow: list[Sector] = field(default_factory=list)
+    stock_inflow: list[Stock] = field(default_factory=list)
+    stock_outflow: list[Stock] = field(default_factory=list)
+
+    @property
+    def sectors(self) -> list[Sector]:
+        """按净流入从高到低排好的板块全集，画面按这个顺序入场。"""
+        return self.sector_inflow + self.sector_outflow
+
+    @property
+    def stocks(self) -> list[Stock]:
+        return self.stock_inflow + self.stock_outflow
 
 
 def as_editorial(raw: dict[str, Any]) -> Editorial:

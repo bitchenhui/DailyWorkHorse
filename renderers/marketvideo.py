@@ -20,10 +20,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterator, Sequence
 
 from PIL import Image, ImageDraw
 
+from core.models import MarketBundle
+from renderers import encode
+from renderers.base import CopyField, RenderResult, VideoAsset
 from renderers.fonts import load_font, text_width
 from renderers.theme import (
     FALL,
@@ -36,13 +40,22 @@ from renderers.theme import (
     STAGE_PANEL,
 )
 
+PLATFORM = "xhs_video"
+PLATFORM_LABEL = "小红书视频"
+TITLE_LIMIT = 20
+TAGS = ("A股", "股市", "资金流向", "行情复盘")
+
 WIDTH, HEIGHT = 1080, 1920
-FPS = 25
+FPS = encode.FPS
 MARGIN = 72
 TRACK_TOP = 330
 TRACK_BOTTOM = 1790
 # 名次平滑：每帧向目标位置靠拢的比例。太大像瞬移，太小追不上收盘排名。
 GLIDE = 0.3
+# 滑行收尾的帧数上限。正常十来帧就位，这里只是防止阈值取太严时空转。
+SETTLE_FRAMES = 30
+# 卡片高占行距的比例。留出的空隙决定了两行挨多近才会看着糊在一起。
+CARD_RATIO = 0.72
 # 标尺平滑：跟着当前峰值走但不逐帧跳变，否则整屏条形一直在抖。
 SCALE_GLIDE = 0.12
 # 条形的最小可见长度。数值太小时至少留一截，让人知道它存在而不是渲染坏了。
@@ -51,6 +64,16 @@ MIN_BAR = 26
 # 取小值：够大才压得住数值接近时的每帧抖动，但太大会让榜尾长期停在错误顺序上
 # ——流入头部动辄几百亿，而流出组彼此只差几千万，阈值跟着峰值走很容易过粗。
 SWAP_MARGIN = 0.0025
+
+
+@dataclass(frozen=True)
+class LayoutFrame:
+    """某一时刻的画面状态。``slots`` 是各行的名次位置（可为小数，即滑行中）。"""
+
+    moment: str
+    values: list[float]
+    slots: list[float]
+    scale: float
 
 
 def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -115,9 +138,13 @@ def _index_strip(draw: ImageDraw.ImageDraw, indexes: Sequence[dict], y: int) -> 
 
 
 def _row_metrics(count: int) -> tuple[float, int]:
-    """把可用高度摊给 ``count`` 行，返回（行距，卡片高）。"""
+    """把可用高度摊给 ``count`` 行，返回（行距，卡片高）。
+
+    卡片高按行距的固定比例取，而不是「行距减去固定间隙」：后者在行多的时候
+    （个股段 12 行）几乎把间隙吃光，两行只要挨近一点就糊成一片。
+    """
     span = (TRACK_BOTTOM - TRACK_TOP) / max(count, 1)
-    card = int(min(104, span - 14))
+    card = int(min(104, span * CARD_RATIO))
     return span, card
 
 
@@ -196,6 +223,49 @@ def _timeline(rows: Sequence[dict]) -> tuple[list[str], list[dict[str, float]]]:
     return axis, lookup
 
 
+def layout(rows: Sequence[dict]) -> Iterator[LayoutFrame]:
+    """逐帧推演画面状态，不碰像素。
+
+    抽出来是为了能直接断言「同一帧里没有两行叠在一起」——
+    这类毛病在成片里只表现为「少了一行」，靠看视频很难定位。
+    """
+    axis, lookup = _timeline(rows)
+    count = len(rows)
+    values = [0.0] * count
+    order = list(range(count))
+    # 初始名次即入场顺序，各就各位不做开场动画。
+    slots = [float(index) for index in range(count)]
+    scale = 0.0
+
+    for moment in axis:
+        for index in range(count):
+            value = lookup[index].get(moment)
+            if value is not None:
+                values[index] = value
+
+        peak = max((abs(value) for value in values), default=1.0) or 1.0
+        scale = peak if scale <= 0 else scale + (peak - scale) * SCALE_GLIDE
+
+        _reorder(order, values, peak * SWAP_MARGIN)
+        for rank, index in enumerate(order):
+            slots[index] += (rank - slots[index]) * GLIDE
+
+        yield LayoutFrame(moment, list(values), list(slots), scale)
+
+    if not axis:
+        return
+
+    # 数据放完后继续滑行到各就各位，再交给定格。
+    # 收盘那一刻名次往往刚翻转，直接定格就会把观众唯一会认真读的一帧
+    # 停在两张卡片叠着的半路上。
+    for _ in range(SETTLE_FRAMES):
+        if max(abs(slots[index] - rank) for rank, index in enumerate(order)) < 0.01:
+            break
+        for rank, index in enumerate(order):
+            slots[index] += (rank - slots[index]) * GLIDE
+        yield LayoutFrame(axis[-1], list(values), list(slots), scale)
+
+
 def _race_frames(
     rows: Sequence[dict],
     title: str,
@@ -207,51 +277,34 @@ def _race_frames(
     if not tracked:
         return
 
-    axis, lookup = _timeline(tracked)
-    if not axis:
-        return
-
     span, card = _row_metrics(len(tracked))
-    glided = [float(index) for index in range(len(tracked))]
-    latest = [0.0] * len(tracked)
-    order = list(range(len(tracked)))
-    scale = 0.0
     image = None
 
-    for moment in axis:
-        for index in range(len(tracked)):
-            value = lookup[index].get(moment)
-            if value is not None:
-                latest[index] = value
-
-        peak = max((abs(value) for value in latest), default=1.0) or 1.0
-        scale = peak if scale <= 0 else scale + (peak - scale) * SCALE_GLIDE
-
-        _reorder(order, latest, peak * SWAP_MARGIN)
-        for rank, index in enumerate(order):
-            glided[index] += (rank - glided[index]) * GLIDE
-
+    for frame in layout(tracked):
         image, draw = _canvas()
         _header(draw, title, subtitle)
-        _clock(draw, moment)
+        _clock(draw, frame.moment)
 
         # 从下往上画：名次靠前的后画，交换过程中榜首永远压在最上层，
         # 不会被正在上升的那张卡片盖住。
-        for index in sorted(range(len(tracked)), key=lambda i: glided[i], reverse=True):
-            value = latest[index]
+        for index in sorted(range(len(tracked)), key=lambda i: frame.slots[i], reverse=True):
+            value = frame.values[index]
             color, soft = _tone(value)
             _bar_row(
                 draw,
-                TRACK_TOP + glided[index] * span,
+                TRACK_TOP + frame.slots[index] * span,
                 card,
                 tracked[index]["name"],
                 _fmt_yi(value),
-                abs(value) / scale,
+                abs(value) / frame.scale,
                 color,
                 soft,
             )
         _disclaimer(draw)
         yield image
+
+    if image is None:
+        return
 
     # 定格若干秒，给观众读完最终排名的时间。
     for _ in range(int(hold_seconds * FPS)):
@@ -329,28 +382,110 @@ def _cover_frames(
         yield image
 
 
-def frames(data: dict, date_text: str) -> Iterator[Image.Image]:
+def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
     """整支视频的帧序列：封面 → 板块赛跑 → 个股赛跑。"""
-    indexes = data.get("indexes") or []
-    sector_inflow = list(data.get("sector_inflow") or [])
-    sector_outflow = list(data.get("sector_outflow") or [])
-    sectors = sector_inflow + sector_outflow
-    stocks = list(data.get("stock_inflow") or []) + list(
-        data.get("stock_outflow") or []
-    )
+    subtitle = f"{bundle.date_text} · 主力资金当日累计净流入"
 
     yield from _cover_frames(
-        indexes, sector_inflow, sector_outflow, date_text, seconds=2.4
+        bundle.indexes,
+        bundle.sector_inflow,
+        bundle.sector_outflow,
+        bundle.date_text,
+        seconds=2.4,
     )
     yield from _race_frames(
-        sectors,
-        "钱流进了哪些行业",
-        f"{date_text} · 主力资金当日累计净流入",
-        hold_seconds=1.6,
+        bundle.sectors, "钱流进了哪些行业", subtitle, hold_seconds=1.6
     )
     yield from _race_frames(
-        stocks,
-        "哪些个股在被抢筹",
-        f"{date_text} · 主力资金当日累计净流入",
-        hold_seconds=2.0,
+        bundle.stocks, "哪些个股在被抢筹", subtitle, hold_seconds=2.0
+    )
+
+
+def build_social_title(bundle: MarketBundle) -> str:
+    """小红书标题上限 20 字，所以按信息量从多到少试，取第一个装得下的。"""
+    candidates: list[str] = []
+    top_in = bundle.sector_inflow[0] if bundle.sector_inflow else None
+    top_out = bundle.sector_outflow[0] if bundle.sector_outflow else None
+
+    if top_in and top_out:
+        candidates.append(
+            f"{top_in['name']}吸金{top_in['net_inflow'] / 1e8:.0f}亿，"
+            f"{top_out['name']}被砸{abs(top_out['net_inflow']) / 1e8:.0f}亿"
+        )
+    if top_in:
+        candidates.append(f"{top_in['name']}今日吸金{top_in['net_inflow'] / 1e8:.0f}亿")
+    candidates.append(f"{bundle.date_text} A股资金流向")
+
+    for candidate in candidates:
+        if len(candidate) <= TITLE_LIMIT:
+            return candidate
+    return candidates[-1][:TITLE_LIMIT]
+
+
+def _flow_lines(rows: Sequence[dict]) -> list[str]:
+    return [f"{row['name']} {_fmt_yi(row['net_inflow'])}" for row in rows]
+
+
+def build_note(bundle: MarketBundle) -> str:
+    """笔记正文，不含标题与话题——这两样在小红书是独立输入框。"""
+    lines = [f"{bundle.date_text} A股主力资金流向。", ""]
+
+    if bundle.indexes:
+        lines.append(
+            " · ".join(
+                f"{index['name']} {_fmt_pct(index['change_pct'])}"
+                for index in bundle.indexes
+            )
+        )
+        lines.append("")
+
+    for label, rows in (
+        ("资金流入最多的行业", bundle.sector_inflow),
+        ("资金流出最多的行业", bundle.sector_outflow),
+        ("被抢筹最多的个股", bundle.stock_inflow),
+        ("被抛售最多的个股", bundle.stock_outflow),
+    ):
+        if not rows:
+            continue
+        lines.append(label)
+        lines.extend(_flow_lines(rows))
+        lines.append("")
+
+    lines.append("主力资金指特大单与大单的净额，数据来自公开行情接口。")
+    lines.append("仅作信息展示，不构成投资建议。")
+    return "\n".join(lines).strip()
+
+
+def render(bundle: MarketBundle) -> RenderResult:
+    """行情日报的成品：一支竖屏视频，外加发布用的三段文案。"""
+    note = build_note(bundle)
+    social_title = build_social_title(bundle)
+
+    # 帧工厂而不是帧列表：整段视频放不进内存，见 VideoAsset 的说明。
+    video = VideoAsset(f"market{encode.preferred_suffix()}", lambda: frames(bundle))
+
+    copy_fields = [
+        CopyField("标题", social_title, f"小红书标题上限 {TITLE_LIMIT} 字", rows=2),
+        CopyField("正文", note, rows=18),
+        CopyField(
+            "话题标签",
+            " ".join(f"#{tag}" for tag in TAGS),
+            "粘贴过去只是普通文字；想进话题页得在正文末尾逐个敲 # 再从下拉里选。",
+            rows=2,
+        ),
+    ]
+
+    return RenderResult(
+        platform=PLATFORM,
+        platform_label=PLATFORM_LABEL,
+        title=social_title,
+        copy_fields=copy_fields,
+        videos=[video],
+        text_files={"note.txt": f"{social_title}\n\n{note}\n"},
+        hint=(
+            "先下载视频再上传，发布时选「视频笔记」；"
+            "封面用视频首帧即可，不必另配图。"
+        ),
+        target_label="打开小红书创作服务平台",
+        target_url="https://creator.xiaohongshu.com/publish/publish",
     )

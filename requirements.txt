@@ -2,3 +2,6 @@ requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
 pillow>=10.0.0
+# 自带 ffmpeg 二进制。系统装了 ffmpeg 时用不上它，但没有它的机器会把
+# 行情视频降级成 GIF——那是能看不能发的东西，不值得留成默认行为。
+imageio-ffmpeg>=0.4.9

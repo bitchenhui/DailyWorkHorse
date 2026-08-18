@@ -1,0 +1,21 @@
+name: Market Flow
+
+on:
+  schedule:
+    # UTC 07:10 = 北京时间 15:10。
+    #
+    # 必须排在 A 股收盘（15:00）之后：视频画的是当日分钟级资金流曲线，
+    # 收盘前跑只能拿到半天的数据，而且末尾那几分钟的集合竞价还没落定。
+    # 留十分钟余量，不卡在 15:00 整点上。
+    - cron: "10 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      platforms: xhs_video
+    secrets: inherit

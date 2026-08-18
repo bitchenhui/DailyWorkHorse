@@ -37,8 +37,11 @@ def env(name: str, default: str | None = None) -> str:
 PLATFORM_LABELS = {
     "wechat_mp": "微信公众号",
     "xhs": "小红书",
+    # 与 xhs 同一个账号，但内容形态与信息源都不同（行情视频 vs 图文日报），
+    # 分成两个 key 才能各写各的产物目录、各自开关。
+    "xhs_video": "小红书视频",
 }
-DEFAULT_PLATFORMS = ("wechat_mp", "xhs")
+DEFAULT_PLATFORMS = ("wechat_mp", "xhs", "xhs_video")
 DEFAULT_TIER = "bundle"
 
 

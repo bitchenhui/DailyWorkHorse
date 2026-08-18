@@ -35,5 +35,82 @@ class NotificationBodyTests(unittest.TestCase):
         self.assertEqual("", pipeline.notification_body([_result("xhs")]))
 
 
+class NotificationTitleTests(unittest.TestCase):
+    def test_title_comes_from_whichever_result_supplied_the_body(self) -> None:
+        results = [
+            _result("xhs", copy_fields=[CopyField("正文", "小红书文案")]),
+            _result("wechat_mp", body_html="<p>正文</p>"),
+        ]
+        results[1].title = "公众号标题"
+
+        self.assertEqual("公众号标题", pipeline.notification_title(results))
+
+    def test_falls_back_when_nothing_has_text(self) -> None:
+        self.assertEqual("标题", pipeline.notification_title([_result("xhs")]))
+
+
+class FakeChannel:
+    def preflight(self) -> None:
+        pass
+
+    def deliver(self, bundle, result):
+        from channels.base import DeliveryResult
+
+        return DeliveryResult(channel="fake", ok=True, detail="", location="mem")
+
+
+class FeedIsolationTests(unittest.TestCase):
+    """一个信息源挂了不能拖垮其余的。
+
+    行情源打的是第三方行情接口，境外 runner 上未必稳；它失败时当天的
+    GitHub 日报照样要发得出去。
+    """
+
+    def setUp(self) -> None:
+        self.feeds = pipeline.FEEDS
+        self.channel = pipeline.resolve_channel
+        self.platforms = pipeline.enabled_platforms
+        pipeline.resolve_channel = lambda platform: FakeChannel()
+        pipeline.enabled_platforms = lambda: ("wechat_mp", "xhs_video")
+
+    def tearDown(self) -> None:
+        pipeline.FEEDS = self.feeds
+        pipeline.resolve_channel = self.channel
+        pipeline.enabled_platforms = self.platforms
+
+    def test_a_broken_feed_does_not_stop_the_others(self) -> None:
+        from tests.fixtures import make_bundle
+
+        def explode():
+            raise RuntimeError("行情接口不通")
+
+        pipeline.FEEDS = (
+            pipeline.Feed("market", explode, {"xhs_video": lambda b: None}),
+            pipeline.Feed(
+                "github",
+                make_bundle,
+                {"wechat_mp": lambda b: _result("wechat_mp", body_html="<p>x</p>")},
+            ),
+        )
+
+        date_text, results = pipeline.distribute()
+
+        self.assertEqual(["wechat_mp"], [r.platform for r in results])
+        self.assertEqual("2026-08-17", date_text)
+
+    def test_configuration_errors_still_stop_the_run(self) -> None:
+        """缺环境变量得当场炸出来，改了配置才有意义，不该被当成临时故障吞掉。"""
+
+        def missing_env():
+            raise SystemExit("缺少环境变量: LLM_API_KEY")
+
+        pipeline.FEEDS = (
+            pipeline.Feed("github", missing_env, {"wechat_mp": lambda b: None}),
+        )
+
+        with self.assertRaises(SystemExit):
+            pipeline.distribute()
+
+
 if __name__ == "__main__":
     unittest.main()

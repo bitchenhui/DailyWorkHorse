@@ -1,0 +1,93 @@
+name: Publish
+
+# 两个信息源各有各的定时任务，但从装环境到发布的步骤完全一样，
+# 所以抽成可复用工作流，免得两份各自漂移。
+on:
+  workflow_call:
+    inputs:
+      platforms:
+        description: 传给 ENABLED_PLATFORMS 的平台列表
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 两个定时任务都往 gh-pages 推，撞上了会有一边推不上去。
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Chinese fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y fonts-noto-cjk
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -t . -v
+
+      # runner 每次都是全新的，dist/ 从空开始。不先把线上站点取回来，
+      # 这一趟就会把另一个信息源上次发布的成稿从 Pages 上抹掉。
+      - name: Restore the published site
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          if git clone --depth 1 --branch gh-pages \
+              "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" dist; then
+            echo "已取回线上站点：$(ls dist | tr '\n' ' ')"
+          else
+            echo "gh-pages 尚不存在，从空站点开始"
+            mkdir -p dist && git -C dist init -q && git -C dist checkout -q -b gh-pages
+          fi
+
+      - name: Generate drafts
+        env:
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+          ENABLED_PLATFORMS: ${{ inputs.platforms }}
+          PUBLIC_DRAFT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: python main.py
+
+      - name: Upload publishing bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: drafts-${{ github.run_number }}
+          # dist/ 是个 git 工作副本，别把 .git 目录一起打包进去。
+          path: |
+            dist/
+            !dist/.git
+          retention-days: 30
+
+      - name: Publish to gh-pages
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          # Pages 默认会跑 Jekyll，下划线开头的文件会被吞掉。
+          touch .nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --quiet --cached; then
+            echo "内容无变化，不推送"
+            exit 0
+          fi
+          git commit -q -m "${{ inputs.platforms }} @ $(date -u +%FT%TZ)"
+          git push -q \
+            "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:gh-pages

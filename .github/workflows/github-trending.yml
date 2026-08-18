@@ -1,0 +1,18 @@
+name: GitHub Trending
+
+on:
+  schedule:
+    # UTC 00:30 = 北京时间 08:30。Trending 的 since=daily 是滚动窗口，
+    # 早上跑拿到的就是前一天的热度。
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      platforms: wechat_mp,xhs
+    secrets: inherit

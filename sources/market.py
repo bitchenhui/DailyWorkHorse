@@ -10,22 +10,26 @@
 - 早先「东财不可用」的判断是错的：那是**突发限流**，头几个请求放行、打快了就
   把 IP 关几分钟。按本文件的节奏走，实测 8/8 一次通过、全程 3 秒。
 
-两个必须记住的数据语义：
+三个必须记住的数据语义：
 
 - **序列是累计值不是每分钟增量**。09:31 那个点是开盘头一分钟的净流入，
   15:00 那个点等于全天合计。想要每分钟净额得自己做差分。
 - **主力 = 超大单 + 大单**，与中小单净额之和恒为零，所以「主力流入」的另一面
   永远是散户在接盘，这是接口的定义决定的，不是当天的行情特征。
+- **板块列表混了三级行业且无法从数据里区分层级**，必须按名字白名单筛到
+  申万一级，详见 ``LEVEL1_INDUSTRIES`` 上方的说明。
 """
 
 from __future__ import annotations
 
 import time
-from typing import TypedDict
+from datetime import datetime
 
 import requests
 
+from core.config import CST
 from core.console import safe_print
+from core.models import FlowPoint, IndexQuote, MarketBundle, Sector, Stock
 
 # 主源在前，降级在后；``_get`` 会按 attempt 轮换。
 HOSTS = ("push2delay.eastmoney.com", "push2.eastmoney.com")
@@ -59,38 +63,29 @@ STOCK_FIELDS = "f12,f14,f2,f3,f62,f184"
 SECTOR_FIELDS = "f12,f14,f3,f62,f184"
 INDEXES = ("1.000001", "0.399001", "0.399006")
 
+# 每页硬上限 100，给再大的 pz 也只回 100。板块共 496 个，五页取完。
+PAGE_SIZE = 100
+SECTOR_PAGES = 6
 
-class FlowPoint(TypedDict):
-    """分钟序列上的一个点。``net_inflow`` 是**当日累计**主力净流入（元）。"""
-
-    time: str
-    net_inflow: float
-
-
-class Sector(TypedDict):
-    code: str
-    name: str
-    change_pct: float
-    net_inflow: float
-    net_ratio: float
-    series: list[FlowPoint]
-
-
-class Stock(TypedDict):
-    code: str
-    name: str
-    price: float
-    change_pct: float
-    net_inflow: float
-    net_ratio: float
-    series: list[FlowPoint]
-
-
-class IndexQuote(TypedDict):
-    code: str
-    name: str
-    price: float
-    change_pct: float
+# 申万一级行业，31 个。
+#
+# 为什么必须写死这份名单：``m:90+t:2`` 把申万一级、二级、三级混在一起返回，
+# 而**没有任何字段能区分层级**——代码段是历史分配顺序（BK12 里既有一级的
+# 「电子」也有二级的「白酒Ⅱ」），罗马数字后缀只是重名时的消歧标记
+# （「面板」没后缀却是三级）。
+#
+# 不筛的后果不是难看而是错：「电子 -143 亿」和它的子行业「半导体 -74 亿」
+# 会各占一行，同一笔钱数两遍，榜单看着像五个行业在跌，其实是两个。
+LEVEL1_INDUSTRIES = frozenset(
+    {
+        "农林牧渔", "基础化工", "钢铁", "有色金属", "电子", "家用电器",
+        "食品饮料", "纺织服饰", "轻工制造", "医药生物", "公用事业",
+        "交通运输", "房地产", "商贸零售", "社会服务", "综合", "建筑材料",
+        "建筑装饰", "电力设备", "机械设备", "国防军工", "计算机", "传媒",
+        "通信", "银行", "非银金融", "汽车", "煤炭", "石油石化", "环保",
+        "美容护理",
+    }
+)
 
 
 def session() -> requests.Session:
@@ -178,11 +173,16 @@ def stock_secid(code: str) -> str:
     return f"{'1' if code[:1] in '69' else '0'}.{code}"
 
 
-def fetch_flow_series(client: requests.Session, secid: str) -> list[FlowPoint]:
-    """某标的当日的分钟级累计主力净流入，拿不到时返回空列表。
+def fetch_flow_series(
+    client: requests.Session, secid: str
+) -> tuple[str, list[FlowPoint]]:
+    """某标的分钟级累计主力净流入，返回（交易日, 曲线）。
 
     ``fields2`` 只要 f51（时间）与 f52（主力净流入）；其余档位（小单、中单、
     大单、超大单）画面上用不到，少要几个字段也少一分被限流的理由。
+
+    交易日要一并带出来：接口在非交易时段返回的是**上一个交易日**的完整曲线，
+    不校验就会把上周五的行情打上今天的日期发出去。
     """
     data = _get(
         client,
@@ -195,57 +195,73 @@ def fetch_flow_series(client: requests.Session, secid: str) -> list[FlowPoint]:
             "fields2": "f51,f52",
         },
     )
+    day = ""
     points: list[FlowPoint] = []
     for line in (data or {}).get("klines") or []:
         parts = str(line).split(",")
         if len(parts) < 2:
             continue
         stamp = parts[0]
-        # "2026-08-17 09:31" → "09:31"，画面上只用得到时刻。
-        clock = stamp.split(" ")[1][:5] if " " in stamp else stamp[:5]
+        # "2026-08-17 09:31" → 日期与 "09:31"，画面上只用得到时刻。
+        if " " in stamp:
+            day, clock = stamp.split(" ")[0], stamp.split(" ")[1][:5]
+        else:
+            clock = stamp[:5]
         points.append({"time": clock, "net_inflow": _to_float(parts[1])})
-    return points
+    return day, points
 
 
-def _base_name(name: str) -> str:
-    """去掉分类层级后缀，用于识别同一板块的重复条目。
+def fetch_sectors(client: requests.Session) -> list[Sector]:
+    """申万一级行业的当日资金流全表，按主力净流入从高到低。
 
-    东财把「白酒Ⅱ」「白酒Ⅲ」当成两个板块返回，数值一模一样，
-    直接上榜就是同一条信息占两行。
+    必须翻完所有页再筛：一级行业在按资金流排序的 496 条里是散布的，
+    截前几页会漏掉。多出来的几个请求换的是「榜单互斥」这个正确性前提。
     """
-    return name.rstrip("ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ") or name
-
-
-def fetch_sectors(
-    client: requests.Session, top: int = 5, ascending: bool = False
-) -> list[Sector]:
-    # 多要几条，去重后才够 top 个。
-    rows = _ranking(client, SECTOR_FS, SECTOR_FIELDS, top + 5, ascending)
-
-    sectors: list[Sector] = []
-    seen: set[str] = set()
-    for row in rows:
-        code = str(row.get("f12") or "")
-        if not code:
-            continue
-        base = _base_name(str(row.get("f14") or code))
-        if base in seen:
-            continue
-        seen.add(base)
-        sectors.append(
-            {
-                "code": code,
-                # 用去掉层级后缀的名字：画面上「白酒」比「白酒Ⅱ」干净，
-                # 而层级信息对观众没有意义。
-                "name": base,
-                "change_pct": _to_float(row.get("f3")),
-                "net_inflow": _to_float(row.get("f62")),
-                "net_ratio": _to_float(row.get("f184")),
-                "series": [],
-            }
+    rows: list[dict] = []
+    for page in range(1, SECTOR_PAGES + 1):
+        page_rows = _rows(
+            _get(
+                client,
+                CLIST,
+                {
+                    "fid": "f62",
+                    "po": "1",
+                    "pz": str(PAGE_SIZE),
+                    "pn": str(page),
+                    "np": "1",
+                    "fltt": "2",
+                    "invt": "2",
+                    "fs": SECTOR_FS,
+                    "fields": SECTOR_FIELDS,
+                },
+            )
         )
-        if len(sectors) == top:
+        rows.extend(page_rows)
+        # 不满一页就是最后一页。据此收口，免得多请求一个空页——
+        # 空 data 会被当成限流，白白重试四次还退避几秒。
+        if len(page_rows) < PAGE_SIZE:
             break
+
+    sectors: list[Sector] = [
+        {
+            "code": str(row.get("f12") or ""),
+            "name": str(row.get("f14") or ""),
+            "change_pct": _to_float(row.get("f3")),
+            "net_inflow": _to_float(row.get("f62")),
+            "net_ratio": _to_float(row.get("f184")),
+            "series": [],
+        }
+        for row in rows
+        if str(row.get("f14") or "") in LEVEL1_INDUSTRIES
+    ]
+
+    missing = len(LEVEL1_INDUSTRIES) - len(sectors)
+    if missing:
+        # 少几个不至于毁掉这一期，但说明上游改了名字，白名单该跟着更新。
+        found = {sector["name"] for sector in sectors}
+        safe_print(f"  警告：{missing} 个一级行业没匹配上 {sorted(LEVEL1_INDUSTRIES - found)}")
+
+    sectors.sort(key=lambda sector: sector["net_inflow"], reverse=True)
     return sectors
 
 
@@ -297,19 +313,22 @@ def fetch_indexes(client: requests.Session) -> list[IndexQuote]:
 
 def _attach_series(
     client: requests.Session, items: list, secid_of, label: str
-) -> None:
-    """就地补上分钟曲线，并报告有多少条真的拿到了。"""
+) -> str:
+    """就地补上分钟曲线，返回观察到的交易日。"""
+    day = ""
     for item in items:
-        item["series"] = fetch_flow_series(client, secid_of(item["code"]))
+        found, item["series"] = fetch_flow_series(client, secid_of(item["code"]))
+        day = day or found
     usable = sum(1 for item in items if item["series"])
     safe_print(f"  {label} {usable}/{len(items)} 条曲线")
+    return day
 
 
 def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
     """采集一期视频所需的全部资金流数据。
 
     默认条数对着竖屏画面定：板块段 5+5 行、个股段 6+6 行，再多就得压缩字号。
-    请求量是 ``5 + 2*(sector_top + stock_top)``，默认 27 个，几秒钟跑完。
+    请求量约 ``10 + 2*(sector_top + stock_top)``，默认 32 个，几秒钟跑完。
     """
     client = session()
 
@@ -319,8 +338,11 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
         safe_print(f"  {index['name']} {index['price']} ({index['change_pct']:+.2f}%)")
 
     safe_print("抓取行业板块资金流排名 …")
-    sector_inflow = fetch_sectors(client, sector_top, ascending=False)
-    sector_outflow = fetch_sectors(client, sector_top, ascending=True)
+    # 一次取全再切两端：既省一次请求，也保证两端来自同一张排序表。
+    sectors = fetch_sectors(client)
+    sector_inflow = sectors[:sector_top]
+    sector_outflow = sectors[: -sector_top - 1 : -1]
+    safe_print(f"  匹配到 {len(sectors)} 个申万一级行业")
     for sector in sector_inflow[:3]:
         safe_print(f"  流入 {sector['name']} {sector['net_inflow'] / 1e8:+.2f} 亿")
     for sector in sector_outflow[:3]:
@@ -331,15 +353,60 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
     stock_outflow = fetch_stocks(client, stock_top, ascending=True)
 
     safe_print("抓取分钟级资金流曲线 …")
-    _attach_series(client, sector_inflow, lambda code: f"90.{code}", "板块流入")
+    day = _attach_series(client, sector_inflow, lambda code: f"90.{code}", "板块流入")
     _attach_series(client, sector_outflow, lambda code: f"90.{code}", "板块流出")
     _attach_series(client, stock_inflow, stock_secid, "个股流入")
     _attach_series(client, stock_outflow, stock_secid, "个股流出")
 
     return {
+        "trading_date": day,
         "indexes": indexes,
         "sector_inflow": sector_inflow,
         "sector_outflow": sector_outflow,
         "stock_inflow": stock_inflow,
         "stock_outflow": stock_outflow,
     }
+
+
+def build_title(date_text: str, sectors: list[Sector]) -> str:
+    """标题直接从数据拼，不走 LLM——这里全是事实，没有可改写的余地。"""
+    if not sectors:
+        return f"{date_text} A股资金流向"
+    top = sectors[0]
+    return (
+        f"{date_text} A股主力资金：{top['name']}净流入 "
+        f"{top['net_inflow'] / 1e8:.0f} 亿"
+    )
+
+
+class NotATradingDay(RuntimeError):
+    """今天没有行情可讲。周末、节假日、以及收盘前跑都会走到这里。"""
+
+
+def build_bundle(sector_top: int = 5, stock_top: int = 6) -> MarketBundle:
+    """采集并装配成管线用的 ``MarketBundle``。
+
+    今天不是交易日就直接抛错，交由管线跳过这个信息源。放行的代价是把
+    上一个交易日的曲线打上今天的日期发出去，那比少发一期严重得多。
+    """
+    date_text = datetime.now(CST).strftime("%Y-%m-%d")
+    data = fetch(sector_top, stock_top)
+
+    day = str(data.get("trading_date") or "")
+    if day != date_text:
+        raise NotATradingDay(
+            f"接口给到的是 {day or '未知日期'} 的行情，今天是 {date_text}"
+        )
+
+    sector_inflow: list[Sector] = data["sector_inflow"]  # type: ignore[assignment]
+
+    return MarketBundle(
+        slug=f"{date_text}-market-flow",
+        date_text=date_text,
+        title=build_title(date_text, sector_inflow),
+        indexes=data["indexes"],  # type: ignore[arg-type]
+        sector_inflow=sector_inflow,
+        sector_outflow=data["sector_outflow"],  # type: ignore[arg-type]
+        stock_inflow=data["stock_inflow"],  # type: ignore[arg-type]
+        stock_outflow=data["stock_outflow"],  # type: ignore[arg-type]
+    )

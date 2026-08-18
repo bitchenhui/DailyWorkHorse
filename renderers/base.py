@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Iterator, Protocol
 
 from PIL import Image
 
-from core.models import ContentBundle
+from core.models import Bundle
+from renderers import encode
 
 
 @dataclass
@@ -23,6 +24,25 @@ class ImageAsset:
 
     def save(self, path: Path) -> None:
         self.image.save(path, format="PNG", optimize=True)
+
+
+@dataclass
+class VideoAsset:
+    """一段视频成品。
+
+    帧以**工厂函数**携带，不是列表也不是生成器：列表放不下（1080×1920 一帧
+    就是 6MB），生成器又只能消费一次，而投递未必只发生一次。
+
+    ``save`` 返回真实写出的路径：环境里没有 ffmpeg 时会降级成 GIF，
+    扩展名跟着变，调用方需要知道最终文件叫什么。
+    """
+
+    name: str
+    frames: Callable[[], Iterator[Image.Image]]
+    fps: int = encode.FPS
+
+    def save(self, path: Path) -> Path:
+        return encode.write(self.frames(), path, self.fps)
 
 
 @dataclass
@@ -53,6 +73,7 @@ class RenderResult:
     body_html: str = ""
     copy_fields: list[CopyField] = field(default_factory=list)
     images: list[ImageAsset] = field(default_factory=list)
+    videos: list[VideoAsset] = field(default_factory=list)
     text_files: dict[str, str] = field(default_factory=dict)
     hint: str = ""
     target_label: str = ""
@@ -62,4 +83,4 @@ class RenderResult:
 class Renderer(Protocol):
     platform: str
 
-    def render(self, bundle: ContentBundle) -> RenderResult: ...
+    def render(self, bundle: Bundle) -> RenderResult: ...
