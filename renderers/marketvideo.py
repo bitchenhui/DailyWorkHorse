@@ -30,12 +30,14 @@ from renderers import encode
 from renderers.base import CopyField, RenderResult, VideoAsset
 from renderers.fonts import load_font, text_width
 from renderers.theme import (
+    ACCENT,
     FALL,
     FALL_SOFT,
     RISE,
     RISE_SOFT,
     STAGE,
     STAGE_INK,
+    STAGE_LINE,
     STAGE_MUTED,
     STAGE_PANEL,
 )
@@ -144,13 +146,59 @@ def _index_strip(draw: ImageDraw.ImageDraw, indexes: Sequence[dict], y: int) -> 
         )
 
 
-def _row_metrics(count: int) -> tuple[float, int]:
+# 行业回顾带在个股段顶部占的高度。板块段跑完后整张榜收缩成这一条，
+# 既是「切到个股了」的强断点，也把行业结论一直挂在上方当上下文。
+RECAP_HEIGHT = 150
+RECAP_EDGE = 3  # 流入、流出各取几个塞进带子
+
+
+def _sector_recap_strip(
+    draw: ImageDraw.ImageDraw,
+    inflow: Sequence[dict],
+    outflow: Sequence[dict],
+    top: int,
+) -> None:
+    """个股段顶部的行业回顾带：流入侧 ▲ 红、流出侧 ▼ 绿，各取几个。
+
+    板块段那 31 行在这里被压成一句话——观众不必记住全表，只要记住
+    「钱从哪几个行业出、进了哪几个」，接着往下看个股怎么承接。
+    """
+    draw.rounded_rectangle(
+        (MARGIN, top, WIDTH - MARGIN, top + RECAP_HEIGHT),
+        radius=24, fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
+    )
+    pad = 28
+    draw.text(
+        (MARGIN + pad, top + 20),
+        "行业回顾 · 主力资金进出",
+        font=load_font(26, bold=True),
+        fill=STAGE_MUTED,
+    )
+
+    name_font = load_font(30, bold=True)
+    y = top + 74
+    x = MARGIN + pad
+    right_limit = WIDTH - MARGIN - pad
+    for mark, rows in (("▲", inflow[:RECAP_EDGE]), ("▼", outflow[:RECAP_EDGE])):
+        for row in rows:
+            color, _ = _tone(row["net_inflow"])
+            chip = f"{mark}{row['name']}"
+            width = text_width(chip, name_font)
+            if x + width > right_limit:
+                break
+            draw.text((x, y), chip, font=name_font, fill=color)
+            x += int(width) + 34
+
+
+def _row_metrics(count: int, track_top: int = TRACK_TOP) -> tuple[float, int]:
     """把可用高度摊给 ``count`` 行，返回（行距，卡片高）。
 
     卡片高按行距的固定比例取，而不是「行距减去固定间隙」：后者在行多的时候
     （板块段 31 行）几乎把间隙吃光，两行只要挨近一点就糊成一片。
+
+    ``track_top`` 让个股段把赛道顶下移，给上方的行业回顾带让位。
     """
-    span = (TRACK_BOTTOM - TRACK_TOP) / max(count, 1)
+    span = (TRACK_BOTTOM - track_top) / max(count, 1)
     card = int(min(104, span * CARD_RATIO))
     return span, card
 
@@ -173,7 +221,7 @@ def _bar_row(
     top = int(y)
     draw.rounded_rectangle(
         (MARGIN, top, WIDTH - MARGIN, top + card), radius=int(card * 0.22),
-        fill=STAGE_PANEL,
+        fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
 
     pad = 22
@@ -217,7 +265,7 @@ def _slim_row(
     top = int(y)
     draw.rounded_rectangle(
         (MARGIN, top, WIDTH - MARGIN, top + card), radius=int(card * 0.28),
-        fill=STAGE_PANEL,
+        fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
 
     size = max(20, int(card * 0.52))
@@ -336,13 +384,20 @@ def _race_frames(
     title: str,
     subtitle: str,
     hold_seconds: float,
+    recap: tuple[Sequence[dict], Sequence[dict]] | None = None,
 ) -> Iterator[Image.Image]:
-    """一段资金赛跑：逐分钟重排名次，条长按当前累计值。"""
+    """一段资金赛跑：逐分钟重排名次，条长按当前累计值。
+
+    ``recap`` 给个股段用：传入（行业流入, 行业流出）就在赛道上方挂一条
+    行业回顾带，赛道整体下移让位。板块段不传，跑满整屏。
+    """
     tracked = [row for row in rows if row.get("series")]
     if not tracked:
         return
 
-    span, card = _row_metrics(len(tracked))
+    track_top = TRACK_TOP + RECAP_HEIGHT + 40 if recap else TRACK_TOP
+    recap_top = TRACK_TOP - 20
+    span, card = _row_metrics(len(tracked), track_top)
     paint = _bar_row if card >= COMPACT_CARD else _slim_row
     image = None
 
@@ -350,6 +405,8 @@ def _race_frames(
         image, draw = _canvas()
         _header(draw, title, subtitle)
         _clock(draw, frame.moment)
+        if recap:
+            _sector_recap_strip(draw, recap[0], recap[1], recap_top)
 
         # 从下往上画：名次靠前的后画，交换过程中榜首永远压在最上层，
         # 不会被正在上升的那张卡片盖住。
@@ -358,7 +415,7 @@ def _race_frames(
             color, soft = _tone(value)
             paint(
                 draw,
-                TRACK_TOP + frame.slots[index] * span,
+                track_top + frame.slots[index] * span,
                 card,
                 tracked[index]["name"],
                 _fmt_yi(value),
@@ -409,26 +466,28 @@ def _cover_frames(
     """
     image, draw = _canvas()
 
-    draw.text((MARGIN, 196), "A 股日报", font=load_font(30), fill=STAGE_MUTED)
+    draw.text((MARGIN, 196), "A 股日报", font=load_font(32, bold=True), fill=ACCENT)
     draw.text(
-        (MARGIN, 244), "今日资金流向", font=load_font(78, bold=True), fill=STAGE_INK
+        (MARGIN, 248), "今日资金流向", font=load_font(88, bold=True), fill=STAGE_INK
     )
     draw.text(
-        (MARGIN, 368),
+        (MARGIN, 380),
         f"{date_text} · 主力资金当日累计净流入",
         font=load_font(32),
         fill=STAGE_MUTED,
     )
 
     draw.rounded_rectangle(
-        (MARGIN, 470, WIDTH - MARGIN, 790), radius=44, fill=STAGE_PANEL
+        (MARGIN, 470, WIDTH - MARGIN, 790), radius=44,
+        fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
     _index_strip(draw, indexes, 560)
 
     draw.rounded_rectangle(
-        (MARGIN, 850, WIDTH - MARGIN, 1500), radius=44, fill=STAGE_PANEL
+        (MARGIN, 850, WIDTH - MARGIN, 1500), radius=44,
+        fill=STAGE_PANEL, outline=STAGE_LINE, width=1,
     )
-    draw.text((MARGIN + 40, 896), "今日之最", font=load_font(32), fill=STAGE_MUTED)
+    draw.text((MARGIN + 40, 896), "今日之最", font=load_font(32, bold=True), fill=STAGE_MUTED)
 
     labels = ("流入榜首", "流入第二")
     picks = [(labels[order], row) for order, row in enumerate(list(inflow)[:2])]
@@ -448,8 +507,81 @@ def _cover_frames(
         yield image
 
 
+def _closing_frames(bundle: MarketBundle, seconds: float) -> Iterator[Image.Image]:
+    """结尾结论定格页：一句话总结当日资金主线 + 行业与个股两端的当日之最。
+
+    和封面呼应但不重复——封面是「接下来讲什么」的预告，这里是「今天到底
+    是什么行情」的结论。视频号/抖音会把最后这一帧当封面缩略图，所以要能
+    独立成图、一眼读懂。
+    """
+    top_in = bundle.sector_inflow[0] if bundle.sector_inflow else None
+    top_out = bundle.sector_outflow[0] if bundle.sector_outflow else None
+    stock_in = bundle.stock_inflow[0] if bundle.stock_inflow else None
+    stock_out = bundle.stock_outflow[0] if bundle.stock_outflow else None
+
+    image, draw = _canvas()
+
+    draw.text((MARGIN, 208), "今日结论", font=load_font(32, bold=True), fill=ACCENT)
+    # 一句话主线：钱从哪流到哪。缺一端就退成半句，不硬凑。
+    if top_in and top_out:
+        headline = f"{top_in['name']}吸金，{top_out['name']}失血"
+    elif top_in:
+        headline = f"{top_in['name']}吸金领跑"
+    else:
+        headline = "今日资金主线"
+    draw.text(
+        (MARGIN, 268),
+        headline,
+        font=load_font(72, bold=True),
+        fill=STAGE_INK,
+    )
+    draw.text(
+        (MARGIN, 384),
+        f"{bundle.date_text} · 主力资金当日累计净流入",
+        font=load_font(32),
+        fill=STAGE_MUTED,
+    )
+
+    draw.rounded_rectangle(
+        (MARGIN, 480, WIDTH - MARGIN, 900), radius=44,
+        fill=RISE_SOFT, outline=STAGE_LINE, width=1,
+    )
+    draw.text((MARGIN + 40, 524), "资金抢筹", font=load_font(32, bold=True), fill=RISE)
+    if top_in:
+        _highlight(draw, 604, "行业流入榜首", top_in["name"], top_in["net_inflow"])
+    if stock_in:
+        _highlight(draw, 744, "个股抢筹榜首", stock_in["name"], stock_in["net_inflow"])
+
+    draw.rounded_rectangle(
+        (MARGIN, 960, WIDTH - MARGIN, 1380), radius=44,
+        fill=FALL_SOFT, outline=STAGE_LINE, width=1,
+    )
+    draw.text((MARGIN + 40, 1004), "资金撤离", font=load_font(32, bold=True), fill=FALL)
+    if top_out:
+        _highlight(draw, 1084, "行业流出榜首", top_out["name"], top_out["net_inflow"])
+    if stock_out:
+        _highlight(draw, 1224, "个股抛售榜首", stock_out["name"], stock_out["net_inflow"])
+
+    draw.text(
+        (MARGIN, 1476),
+        "红为主力净流入，绿为净流出",
+        font=load_font(30),
+        fill=STAGE_MUTED,
+    )
+    draw.text(
+        (MARGIN, 1540),
+        "关注一下，每天一分钟看懂 A 股资金去向",
+        font=load_font(38, bold=True),
+        fill=STAGE_INK,
+    )
+    _disclaimer(draw)
+
+    for _ in range(max(1, int(seconds * FPS))):
+        yield image
+
+
 def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
-    """整支视频的帧序列：封面 → 板块赛跑 → 个股赛跑。"""
+    """整支视频的帧序列：封面 → 板块赛跑 → 个股赛跑（顶部挂行业回顾带）→ 结论页。"""
     subtitle = f"{bundle.date_text} · 主力资金当日累计净流入"
 
     yield from _cover_frames(
@@ -469,9 +601,16 @@ def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
         # 31 行比个股段多一倍还多，定格得给够读完的时间。
         hold_seconds=2.5,
     )
+    # 个股段顶部挂行业回顾带：板块那 31 行收缩成一句话，既是「切到个股了」
+    # 的断点，也把行业结论留在上方当上下文，避免观众没注意到后面还有个股。
     yield from _race_frames(
-        bundle.stocks, "哪些个股在被抢筹", subtitle, hold_seconds=2.0
+        bundle.stocks,
+        "哪些个股在被抢筹",
+        subtitle,
+        hold_seconds=2.0,
+        recap=(bundle.sector_inflow, bundle.sector_outflow),
     )
+    yield from _closing_frames(bundle, seconds=2.8)
 
 
 def build_social_title(bundle: MarketBundle) -> str:

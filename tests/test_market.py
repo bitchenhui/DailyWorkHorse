@@ -102,6 +102,34 @@ class CopyTests(unittest.TestCase):
         self.assertEqual("", result.body_html)
 
 
+class StructureTests(unittest.TestCase):
+    def test_closing_page_is_the_last_thing_yielded(self) -> None:
+        """结论页要真的接在片尾。
+
+        少了它，视频跑完个股榜就直接黑掉，没有可当封面缩略图的定格结论。
+        末尾若干帧应当全等（定格），且不同于个股段最后一帧。
+        """
+        bundle = make_market_bundle(minutes=2)
+        seq = list(marketvideo.frames(bundle))
+        hold = int(2.8 * marketvideo.FPS)
+
+        tail = seq[-hold:]
+        self.assertTrue(
+            all(frame.tobytes() == tail[0].tobytes() for frame in tail),
+            "结论页没有定格成一串相同帧",
+        )
+        self.assertNotEqual(
+            seq[-hold - 1].tobytes(),
+            tail[0].tobytes(),
+            "结论页与前一段之间没有切换",
+        )
+
+    def test_stock_segment_reserves_room_for_the_recap_strip(self) -> None:
+        """个股段的赛道顶要给行业回顾带让位，不能顶到板块段那么高。"""
+        with_recap = marketvideo.TRACK_TOP + marketvideo.RECAP_HEIGHT + 40
+        self.assertGreater(with_recap, marketvideo.TRACK_TOP)
+
+
 class EncodeTests(unittest.TestCase):
     def frames(self):
         # 一帧就是 1080×1920，测编码链路取几帧就够，不必渲染整段。
