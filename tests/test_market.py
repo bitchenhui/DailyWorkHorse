@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from core.config import CST
+from core.models import NothingToPublish
 from renderers import encode, marketvideo
 from sources import market
 from tests.fixtures import make_market_bundle, make_series
@@ -140,13 +141,27 @@ class EncodeTests(unittest.TestCase):
         self.assertEqual(first.tobytes(), second.tobytes())
 
 
+def _today() -> str:
+    return datetime.now(CST).strftime("%Y-%m-%d")
+
+
 class TradingDayTests(unittest.TestCase):
     """非交易日跑，接口给的是上一个交易日的完整曲线，必须识别出来。"""
 
-    def run_with(self, trading_date: str):
-        original = market.fetch
+    def run_with(
+        self,
+        trading_date: str,
+        last_clock: str = market.SESSION_CLOSE,
+        after_deadline: bool = False,
+    ):
+        original_fetch = market.fetch
+        original_deadline = market.DATA_DEADLINE
+        # 「此刻」不好摆布，改成挪动截止时刻：压到 00:00 就是永远已过，
+        # 推到 23:59 就是永远没到。
+        market.DATA_DEADLINE = "00:00" if after_deadline else "23:59"
         market.fetch = lambda *a, **k: {
             "trading_date": trading_date,
+            "last_clock": last_clock,
             "indexes": [],
             "sector_inflow": [],
             "sector_outflow": [],
@@ -156,7 +171,8 @@ class TradingDayTests(unittest.TestCase):
         try:
             return market.build_bundle()
         finally:
-            market.fetch = original
+            market.fetch = original_fetch
+            market.DATA_DEADLINE = original_deadline
 
     def test_stale_data_is_rejected(self) -> None:
         with self.assertRaises(market.NotATradingDay):
@@ -166,9 +182,41 @@ class TradingDayTests(unittest.TestCase):
         with self.assertRaises(market.NotATradingDay):
             self.run_with("")
 
-    def test_today_is_accepted(self) -> None:
-        today = datetime.now(CST).strftime("%Y-%m-%d")
-        self.assertEqual(today, self.run_with(today).date_text)
+    def test_a_closed_trading_day_is_accepted(self) -> None:
+        self.assertEqual(_today(), self.run_with(_today()).date_text)
+
+    def test_a_half_day_curve_is_rejected(self) -> None:
+        """盘中跑拿到的是半天曲线。
+
+        它画出来和全天的一模一样，看不出是残的，所以必须在这里拦下——
+        定时任务排在 15:10，只有手动触发才会走到。
+        """
+        with self.assertRaises(market.SessionNotClosed):
+            self.run_with(_today(), "11:30")
+
+    def test_the_lunch_break_does_not_count_as_closed(self) -> None:
+        with self.assertRaises(market.SessionNotClosed):
+            self.run_with(_today(), "14:59")
+
+    def test_an_empty_curve_is_rejected(self) -> None:
+        with self.assertRaises(market.SessionNotClosed):
+            self.run_with(_today(), "")
+
+    def test_a_lagging_source_after_the_close_is_a_failure(self) -> None:
+        """收盘后曲线还不全，这一天本该出片。
+
+        安静跳过等于漏发一期还没人知道，所以要抛非 ``NothingToPublish``
+        的错，让这次运行亮红。
+        """
+        with self.assertRaises(market.MarketDataLagging):
+            self.run_with(_today(), "14:30", after_deadline=True)
+
+        self.assertNotIsInstance(market.MarketDataLagging(""), NothingToPublish)
+
+    def test_the_stale_date_check_runs_first(self) -> None:
+        """非交易日拿到的是上一交易日的**完整**曲线，时刻校验会放行。"""
+        with self.assertRaises(market.NotATradingDay):
+            self.run_with("1999-01-04", market.SESSION_CLOSE)
 
 
 class SeriesFixtureTests(unittest.TestCase):

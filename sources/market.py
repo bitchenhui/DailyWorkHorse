@@ -29,7 +29,14 @@ import requests
 
 from core.config import CST
 from core.console import safe_print
-from core.models import FlowPoint, IndexQuote, MarketBundle, Sector, Stock
+from core.models import (
+    FlowPoint,
+    IndexQuote,
+    MarketBundle,
+    NothingToPublish,
+    Sector,
+    Stock,
+)
 
 # 主源在前，降级在后；``_get`` 会按 attempt 轮换。
 HOSTS = ("push2delay.eastmoney.com", "push2.eastmoney.com")
@@ -62,6 +69,16 @@ SECTOR_FS = "m:90+t:2"
 STOCK_FIELDS = "f12,f14,f2,f3,f62,f184"
 SECTOR_FIELDS = "f12,f14,f3,f62,f184"
 INDEXES = ("1.000001", "0.399001", "0.399006")
+
+# 一个完整交易日的曲线：09:31–11:30 与 13:01–15:00，各 120 个点。
+# 实测末点时刻就等于当前时刻（接口虽叫 delay 但资金流 kline 是实时的），
+# 所以「末点到没到 15:00」可以直接当作「收盘了没有」来用。
+SESSION_CLOSE = "15:00"
+
+# 收盘后再宽限几分钟，接口写完最后一个点需要一点时间。
+# 过了这个点曲线还不完整，那就不是「还没收盘」而是上游滞后了——
+# 两者的处理天差地别，见 ``build_bundle``。
+DATA_DEADLINE = "15:05"
 
 # 每页硬上限 100，给再大的 pz 也只回 100。板块共 496 个，五页取完。
 PAGE_SIZE = 100
@@ -171,6 +188,11 @@ def _ranking(
 def stock_secid(code: str) -> str:
     """沪市（6 开头，含 9 开头的 B 股）前缀 1，深市与北交所前缀 0。"""
     return f"{'1' if code[:1] in '69' else '0'}.{code}"
+
+
+def sector_secid(code: str) -> str:
+    """板块统一走 90 市场号。"""
+    return f"90.{code}"
 
 
 def fetch_flow_series(
@@ -313,15 +335,22 @@ def fetch_indexes(client: requests.Session) -> list[IndexQuote]:
 
 def _attach_series(
     client: requests.Session, items: list, secid_of, label: str
-) -> str:
-    """就地补上分钟曲线，返回观察到的交易日。"""
+) -> tuple[str, str]:
+    """就地补上分钟曲线，返回（交易日, 最晚时刻）。
+
+    最晚时刻取各条曲线的最大值而非要求一致：个股盘中停牌会让它那条提前
+    结束，那说明的是这只票停了，不是全市场收盘了。
+    """
     day = ""
+    last = ""
     for item in items:
         found, item["series"] = fetch_flow_series(client, secid_of(item["code"]))
         day = day or found
+        if item["series"]:
+            last = max(last, item["series"][-1]["time"])
     usable = sum(1 for item in items if item["series"])
-    safe_print(f"  {label} {usable}/{len(items)} 条曲线")
-    return day
+    safe_print(f"  {label} {usable}/{len(items)} 条曲线，末点 {last or '—'}")
+    return day, last
 
 
 def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
@@ -353,13 +382,21 @@ def fetch(sector_top: int = 5, stock_top: int = 6) -> dict[str, object]:
     stock_outflow = fetch_stocks(client, stock_top, ascending=True)
 
     safe_print("抓取分钟级资金流曲线 …")
-    day = _attach_series(client, sector_inflow, lambda code: f"90.{code}", "板块流入")
-    _attach_series(client, sector_outflow, lambda code: f"90.{code}", "板块流出")
-    _attach_series(client, stock_inflow, stock_secid, "个股流入")
-    _attach_series(client, stock_outflow, stock_secid, "个股流出")
+    day = ""
+    last = ""
+    for items, secid_of, label in (
+        (sector_inflow, sector_secid, "板块流入"),
+        (sector_outflow, sector_secid, "板块流出"),
+        (stock_inflow, stock_secid, "个股流入"),
+        (stock_outflow, stock_secid, "个股流出"),
+    ):
+        found, clock = _attach_series(client, items, secid_of, label)
+        day = day or found
+        last = max(last, clock)
 
     return {
         "trading_date": day,
+        "last_clock": last,
         "indexes": indexes,
         "sector_inflow": sector_inflow,
         "sector_outflow": sector_outflow,
@@ -379,24 +416,60 @@ def build_title(date_text: str, sectors: list[Sector]) -> str:
     )
 
 
-class NotATradingDay(RuntimeError):
-    """今天没有行情可讲。周末、节假日、以及收盘前跑都会走到这里。"""
+class NotATradingDay(NothingToPublish):
+    """今天没有行情可讲——周末与节假日。
+
+    非交易时段接口照样返回**上一个交易日**的完整曲线，不校验就会把上周五的
+    行情打上今天的日期发出去。
+    """
+
+
+class SessionNotClosed(NothingToPublish):
+    """还没收盘，曲线只有半天。
+
+    半天的曲线画出来和全天的一模一样，看不出是残的——标题还写着「当日
+    累计」。宁可这一趟不出片，也不能发一支名不副实的视频。
+
+    这属于「本来就没得发」：定时任务排在收盘后，只有手动触发才会撞上。
+    """
+
+
+class MarketDataLagging(RuntimeError):
+    """已经收盘了，曲线却还没补齐。
+
+    刻意不归到 ``NothingToPublish``：这一天本该有片子。安静跳过等于漏发一期
+    还没人知道，所以要让这次运行留下失败记录，重跑一次通常就好了。
+    """
 
 
 def build_bundle(sector_top: int = 5, stock_top: int = 6) -> MarketBundle:
     """采集并装配成管线用的 ``MarketBundle``。
 
-    今天不是交易日就直接抛错，交由管线跳过这个信息源。放行的代价是把
-    上一个交易日的曲线打上今天的日期发出去，那比少发一期严重得多。
+    宁可少发一期，也不发一期错的，所以数据不合格一律抛错。抛哪一种要看
+    「今天本该有片子吗」：
+
+    - 周末节假日 → ``NotATradingDay``，安静跳过，运行照样算成功。
+    - 收盘前手动触发 → ``SessionNotClosed``，同上。
+    - 收盘后曲线还不全 → ``MarketDataLagging``，让这次运行失败。
+      这一天本该出片，静默跳过就成了「漏发一期还没人知道」。
     """
     date_text = datetime.now(CST).strftime("%Y-%m-%d")
     data = fetch(sector_top, stock_top)
 
+    # 先查日期：非交易日拿到的是上一交易日的**完整**曲线，
+    # 时刻校验会放行，只有日期能识破。
     day = str(data.get("trading_date") or "")
     if day != date_text:
         raise NotATradingDay(
             f"接口给到的是 {day or '未知日期'} 的行情，今天是 {date_text}"
         )
+
+    last = str(data.get("last_clock") or "")
+    if last < SESSION_CLOSE:
+        detail = f"曲线只到 {last or '空'}，不足一个完整交易日（需到 {SESSION_CLOSE}）"
+        if datetime.now(CST).strftime("%H:%M") >= DATA_DEADLINE:
+            raise MarketDataLagging(f"{detail}；此刻早已过 {DATA_DEADLINE}，上游滞后")
+        raise SessionNotClosed(detail)
 
     sector_inflow: list[Sector] = data["sector_inflow"]  # type: ignore[assignment]
 

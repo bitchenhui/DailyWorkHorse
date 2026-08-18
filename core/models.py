@@ -10,6 +10,15 @@ from dataclasses import dataclass, field
 from typing import Any, TypedDict
 
 
+class NothingToPublish(RuntimeError):
+    """这个信息源今天本来就没有内容，不是故障。
+
+    周末的行情、尚未收盘的半天数据都属于这一类。管线据此把「今天没得发」
+    和「抓取挂了」分开：前者安静跳过并正常收工，后者要让这次运行留下失败
+    记录。否则行情那条流水线每逢周末都会亮红叉，久了就没人再看告警。
+    """
+
+
 class RepoItem(TypedDict):
     """信息源产出的单条领域对象。"""
 

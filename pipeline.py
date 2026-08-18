@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from html import escape as _esc
 from typing import Callable
@@ -20,7 +20,7 @@ from core.config import (
     platform_tier,
 )
 from core.console import safe_print
-from core.models import Bundle, ContentBundle
+from core.models import Bundle, ContentBundle, NothingToPublish
 from enrich import editorial as editorial_enricher
 from enrich import social as social_enricher
 from renderers import article, carddeck, marketvideo
@@ -89,15 +89,29 @@ def resolve_channel(platform: str) -> Channel:
     )
 
 
-def distribute() -> tuple[str, list[RenderResult]]:
-    """跑完所有启用的平台，返回（日期, 各平台成品）。"""
+@dataclass
+class Outcome:
+    """一次分发的结果。
+
+    ``idle`` 与 ``failed`` 必须分开：行情源在周末本来就没内容，那是预期内的
+    「今天没得发」；抓取超时才是故障。两者混在一起，要么周末天天亮红叉，
+    要么真出事时没人知道。
+    """
+
+    date_text: str
+    results: list[RenderResult] = field(default_factory=list)
+    idle: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+
+
+def distribute() -> Outcome:
+    """跑完所有启用的平台。"""
     enabled = enabled_platforms()
     unclaimed = set(enabled) - {p for feed in FEEDS for p in feed.renderers}
     for platform in sorted(unclaimed):
         safe_print(f"  跳过 {platform}：尚无渲染器")
 
-    results: list[RenderResult] = []
-    date_text = datetime.now(CST).strftime("%Y-%m-%d")
+    outcome = Outcome(datetime.now(CST).strftime("%Y-%m-%d"))
 
     for feed in FEEDS:
         wanted = [p for p in enabled if p in feed.renderers]
@@ -108,7 +122,7 @@ def distribute() -> tuple[str, list[RenderResult]]:
         # 不该让它把当天的 GitHub 日报一起拖没。
         try:
             bundle = feed.build()
-            date_text = bundle.date_text
+            outcome.date_text = bundle.date_text
             for platform in wanted:
                 result = feed.renderers[platform](bundle)
                 channel = resolve_channel(platform)
@@ -118,13 +132,17 @@ def distribute() -> tuple[str, list[RenderResult]]:
                     f"  {result.platform_label} → {delivered.location}"
                     f" ({delivered.detail})"
                 )
-                results.append(result)
+                outcome.results.append(result)
         except SystemExit:
             # 缺环境变量之类的配置错误，改了配置才有意义，不该被吞掉。
             raise
+        except NothingToPublish as reason:
+            safe_print(f"  信息源 {feed.name} 今天没有内容：{reason}")
+            outcome.idle.append(f"{feed.name}（{reason}）")
         except Exception as error:  # noqa: BLE001 - 单个信息源失败不影响其余
             safe_print(f"  信息源 {feed.name} 失败，跳过：{type(error).__name__}: {error}")
-    return date_text, results
+            outcome.failed.append(f"{feed.name}（{type(error).__name__}: {error}）")
+    return outcome
 
 
 def notification_title(results: list[RenderResult]) -> str:
@@ -166,8 +184,15 @@ def _draft_link_card(draft_url: str) -> str:
 
 
 def run(dry_run: bool = False) -> int:
-    _, results = distribute()
+    outcome = distribute()
+    results = outcome.results
     if not results:
+        if outcome.failed:
+            raise RuntimeError("信息源全部失败：" + "；".join(outcome.failed))
+        if outcome.idle:
+            # 正常收工：周末的行情流水线走的就是这一支，不该记成失败。
+            safe_print("今天没有可发布的内容：" + "；".join(outcome.idle))
+            return 0
         raise RuntimeError("没有任何平台产出成稿，请检查 ENABLED_PLATFORMS")
 
     # 总览页扫的是磁盘，所以会连带列出往次运行留在站点上的其它平台。

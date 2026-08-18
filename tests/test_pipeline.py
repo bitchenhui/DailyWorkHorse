@@ -2,6 +2,7 @@ import unittest
 
 import pipeline
 from renderers.base import CopyField, RenderResult
+from sources import market
 
 
 def _result(platform: str, **kwargs) -> RenderResult:
@@ -93,10 +94,12 @@ class FeedIsolationTests(unittest.TestCase):
             ),
         )
 
-        date_text, results = pipeline.distribute()
+        outcome = pipeline.distribute()
 
-        self.assertEqual(["wechat_mp"], [r.platform for r in results])
-        self.assertEqual("2026-08-17", date_text)
+        self.assertEqual(["wechat_mp"], [r.platform for r in outcome.results])
+        self.assertEqual("2026-08-17", outcome.date_text)
+        self.assertEqual([], outcome.idle)
+        self.assertEqual(1, len(outcome.failed))
 
     def test_configuration_errors_still_stop_the_run(self) -> None:
         """缺环境变量得当场炸出来，改了配置才有意义，不该被当成临时故障吞掉。"""
@@ -110,6 +113,50 @@ class FeedIsolationTests(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             pipeline.distribute()
+
+
+class IdleVsBrokenTests(unittest.TestCase):
+    """「今天没得发」和「抓取挂了」得走不同的出口。
+
+    行情流水线每逢周末都会无内容可发。若把它记成失败，Actions 上一周两次
+    红叉，真出故障时就淹没在噪音里了。
+    """
+
+    def setUp(self) -> None:
+        self.feeds = pipeline.FEEDS
+        self.platforms = pipeline.enabled_platforms
+        pipeline.enabled_platforms = lambda: ("xhs_video",)
+
+    def tearDown(self) -> None:
+        pipeline.FEEDS = self.feeds
+        pipeline.enabled_platforms = self.platforms
+
+    def _market_feed(self, error: Exception) -> None:
+        def build():
+            raise error
+
+        pipeline.FEEDS = (
+            pipeline.Feed("market", build, {"xhs_video": lambda b: None}),
+        )
+
+    def test_a_closed_source_finishes_quietly(self) -> None:
+        self._market_feed(market.NotATradingDay("今天是周六"))
+
+        outcome = pipeline.distribute()
+
+        self.assertEqual([], outcome.failed)
+        self.assertEqual(1, len(outcome.idle))
+        self.assertEqual(0, pipeline.run(dry_run=True))
+
+    def test_a_real_failure_still_fails_the_run(self) -> None:
+        self._market_feed(RuntimeError("行情接口不通"))
+
+        outcome = pipeline.distribute()
+
+        self.assertEqual([], outcome.idle)
+        self.assertEqual(1, len(outcome.failed))
+        with self.assertRaises(RuntimeError):
+            pipeline.run(dry_run=True)
 
 
 if __name__ == "__main__":
