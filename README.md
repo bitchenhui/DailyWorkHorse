@@ -131,12 +131,20 @@ A 股资金流视频（1080×1920，约 25 秒）：
 
 | Name | 说明 |
 |------|------|
-| `MAIL_CONNECTION` | 形如 `smtp://账号:授权码@smtp.qq.com:465`。QQ 与 163 邮箱要用**授权码**，不是登录密码 |
+| `MAIL_USERNAME` | 完整邮箱地址，如 `yourname@163.com` |
+| `MAIL_PASSWORD` | **授权码**，不是登录密码（163：设置 → POP3/SMTP/IMAP → 开启 SMTP） |
 | `MAIL_TO` | 收件地址，多个用逗号分隔 |
-| `MAIL_FROM` | 可选。多数邮箱要求发件地址与认证账号一致；留空则用 `MAIL_TO`，只发给自己时够用 |
+| `MAIL_FROM` | 可选，默认与 `MAIL_USERNAME` 相同。163 要求发件地址与登录账号一致 |
 
-不配 `MAIL_CONNECTION` 就不发邮件，工作流照常跑完。邮件在失败时也会发——
-跑挂了才最需要知道，所以主题会写明这趟是就绪、空跑还是失败。
+工作流默认连 `smtp.163.com:465` 并开启 SSL。不要用 `MAIL_CONNECTION` 那种
+`smtp://…:465` 写法——465 是隐式 SSL，那种 URL 不会握手，会报
+`Unexpected socket close`。
+
+不配邮件相关的 secret 就不发信，成稿照常发布。发信步骤失败也不会把整趟标红。
+
+> 若改完仍发不出：163 有时会拒绝 GitHub Actions 境外 IP 的 SMTP 连接。
+> 可换 QQ 邮箱（改 workflow 里 `server_address` 为 `smtp.qq.com`），或改用 Gmail
+> 应用专用密码。
 
 可选的仓库 **Variables**（Settings → Secrets and variables → Actions → Variables）：
 
