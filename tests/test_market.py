@@ -10,7 +10,8 @@ from tempfile import TemporaryDirectory
 
 from core.config import CST
 from core.models import NothingToPublish
-from renderers import encode, marketvideo
+from enrich import narration
+from renderers import audio, encode, marketvideo
 from sources import market
 from tests.fixtures import make_market_bundle, make_series
 
@@ -100,6 +101,63 @@ class CopyTests(unittest.TestCase):
             ["标题", "正文", "话题标签"], [f.label for f in result.copy_fields]
         )
         self.assertEqual("", result.body_html)
+
+
+class NarrationTests(unittest.TestCase):
+    def test_fallback_names_both_ends_and_the_disclaimer(self) -> None:
+        script = narration.fallback(make_market_bundle())
+
+        self.assertIn("农林牧渔", script)  # 流入榜首
+        self.assertIn("电子", script)  # 流出榜首
+        self.assertIn("不构成投资建议", script)
+
+    def test_fallback_stays_short_enough_for_the_clip(self) -> None:
+        """整片约 11 秒，配音靠 ``-shortest`` 随画面收口，稿子太长尾巴会被切掉。
+
+        兜底稿没有 LLM 的字数约束、最容易写长，这条钉住上限，防止回归到
+        「连免责声明都念不完就被截断」的状态。
+        """
+        self.assertLessEqual(len(narration.fallback(make_market_bundle())), 50)
+
+    def test_build_script_falls_back_when_the_model_is_unavailable(self) -> None:
+        """缺 LLM（只跑 xhs_video 的常态）时静默退到纯数据兜底稿，绝不阻断出片。"""
+        bundle = make_market_bundle()
+
+        def _no_model(*_a, **_k):
+            raise SystemExit("没有配置 LLM_API_KEY")
+
+        original = narration.llm.complete
+        narration.llm.complete = _no_model
+        try:
+            self.assertEqual(narration.build_script(bundle), narration.fallback(bundle))
+        finally:
+            narration.llm.complete = original
+
+
+class AudioTests(unittest.TestCase):
+    def test_repo_ships_a_bgm_asset(self) -> None:
+        """随仓入库的 BGM 得真的在，否则成片就只有配音、没有背景乐。"""
+        self.assertIsNotNone(audio.resolve_bgm())
+
+    def test_synthesize_returns_none_for_empty_text(self) -> None:
+        """没有文本就不该去合成——最省事的降级路径，不碰网络也不装 edge-tts。"""
+        self.assertIsNone(audio.synthesize(""))
+
+    def test_render_attaches_narration_and_the_bgm(self) -> None:
+        """行情视频要带上音频规格：口播稿文本 + 仓库里的 BGM 路径。"""
+        def _no_model(*_a, **_k):
+            raise SystemExit("没有配置 LLM_API_KEY")
+
+        original = narration.llm.complete
+        narration.llm.complete = _no_model
+        try:
+            asset = marketvideo.render(make_market_bundle()).videos[0]
+        finally:
+            narration.llm.complete = original
+
+        self.assertIsNotNone(asset.audio)
+        self.assertTrue(asset.audio.narration)
+        self.assertEqual(asset.audio.bgm, audio.resolve_bgm())
 
 
 class StructureTests(unittest.TestCase):
@@ -192,9 +250,13 @@ class TradingDayTests(unittest.TestCase):
     ):
         original_fetch = market.fetch
         original_deadline = market.DATA_DEADLINE
+        original_retry = market.LAGGING_RETRY_SECONDS
         # 「此刻」不好摆布，改成挪动截止时刻：压到 00:00 就是永远已过，
         # 推到 23:59 就是永远没到。
         market.DATA_DEADLINE = "00:00" if after_deadline else "23:59"
+        # 滞后重取的真实等待在单测里没意义，置零免得真睡；重取仍会走一遍
+        # （mock 的 fetch 返回同一份滞后数据），因此该失败的仍会失败。
+        market.LAGGING_RETRY_SECONDS = 0
         market.fetch = lambda *a, **k: {
             "trading_date": trading_date,
             "last_clock": last_clock,
@@ -208,6 +270,7 @@ class TradingDayTests(unittest.TestCase):
         finally:
             market.fetch = original_fetch
             market.DATA_DEADLINE = original_deadline
+            market.LAGGING_RETRY_SECONDS = original_retry
 
     def test_stale_data_is_rejected(self) -> None:
         with self.assertRaises(market.NotATradingDay):

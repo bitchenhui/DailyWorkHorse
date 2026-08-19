@@ -80,6 +80,12 @@ SESSION_CLOSE = "15:00"
 # 两者的处理天差地别，见 ``build_bundle``。
 DATA_DEADLINE = "15:05"
 
+# 收盘后发现曲线还差最后几分钟时，先原地等这么久再重取一次。
+# 东财偶尔写点滞后：第一次太早取到半截、隔十几秒就齐了，正是用户遇到的
+# 「第一次失败、第二次成功」。等一次基本就消掉这个瞬时坑；仍不齐才判滞后。
+# 设成模块常量便于测试置零，免得单测里真睡。
+LAGGING_RETRY_SECONDS = 20
+
 # 每页硬上限 100，给再大的 pz 也只回 100。板块共 496 个，五页取完。
 PAGE_SIZE = 100
 SECTOR_PAGES = 6
@@ -466,10 +472,30 @@ def build_bundle(stock_top: int = 6) -> MarketBundle:
 
     last = str(data.get("last_clock") or "")
     if last < SESSION_CLOSE:
-        detail = f"曲线只到 {last or '空'}，不足一个完整交易日（需到 {SESSION_CLOSE}）"
-        if datetime.now(CST).strftime("%H:%M") >= DATA_DEADLINE:
-            raise MarketDataLagging(f"{detail}；此刻早已过 {DATA_DEADLINE}，上游滞后")
-        raise SessionNotClosed(detail)
+        # 收盘前：这就是正常的半天曲线，安静跳过。
+        if datetime.now(CST).strftime("%H:%M") < DATA_DEADLINE:
+            raise SessionNotClosed(
+                f"曲线只到 {last or '空'}，不足一个完整交易日（需到 {SESSION_CLOSE}）"
+            )
+        # 已过宽限点却还差几分钟：多半是上游写点滞后。原地等一次再重取一遍，
+        # 直接消解「第一次太早失败、重试才成」的瞬时坑；仍不齐才判上游滞后。
+        if LAGGING_RETRY_SECONDS > 0:
+            safe_print(
+                f"  收盘后曲线只到 {last or '空'}，等待 {LAGGING_RETRY_SECONDS}s 后重取一次 …"
+            )
+            time.sleep(LAGGING_RETRY_SECONDS)
+            data = fetch(stock_top)
+            day = str(data.get("trading_date") or "")
+            if day != date_text:
+                raise NotATradingDay(
+                    f"接口给到的是 {day or '未知日期'} 的行情，今天是 {date_text}"
+                )
+            last = str(data.get("last_clock") or "")
+        if last < SESSION_CLOSE:
+            raise MarketDataLagging(
+                f"曲线只到 {last or '空'}，不足一个完整交易日（需到 {SESSION_CLOSE}）；"
+                f"此刻早已过 {DATA_DEADLINE}，上游滞后"
+            )
 
     sectors: list[Sector] = data["sectors"]  # type: ignore[assignment]
 

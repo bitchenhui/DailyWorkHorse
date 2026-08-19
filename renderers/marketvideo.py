@@ -28,7 +28,8 @@ from typing import Iterator, Sequence
 from PIL import Image, ImageDraw
 
 from core.models import MarketBundle
-from renderers import encode
+from enrich import narration
+from renderers import audio, encode
 from renderers.base import CopyField, RenderResult, VideoAsset
 from renderers.fonts import load_font, text_width
 from renderers.theme import (
@@ -56,7 +57,15 @@ MARGIN = 72
 TRACK_TOP = 260
 TRACK_BOTTOM = 1800
 # 名次平滑：每帧向目标位置靠拢的比例。太大像瞬移，太小追不上收盘排名。
-GLIDE = 0.3
+# 取 0.18：换位滑行拉长到约半秒，肉眼看是「顺滑挪过去」而非「啪地跳一格」。
+GLIDE = 0.18
+# 显示值平滑：条长与数值跟着累计值走，但不逐分钟硬跳。累计曲线本身抖动不大，
+# 一层轻 EMA 就能把每帧的小台阶抹平，让色条平稳生长。注意只作用于**显示**，
+# 排序与换位仍用真实累计值，收盘名次不受影响。
+VALUE_GLIDE = 0.35
+# 段间交叉淡入的帧数。封面/结论页是静止页，硬切上去会「顿」一下；
+# 用几帧 blend 过渡，视觉上就连起来了。约 0.24 秒。
+CROSSFADE_FRAMES = 6
 # 滑行收尾的帧数上限。正常十来帧就位，这里只是防止阈值取太严时空转。
 SETTLE_FRAMES = 30
 # 卡片高占行距的比例。留出的空隙决定了两行挨多近才会看着糊在一起。
@@ -79,7 +88,11 @@ SWAP_MARGIN = 0.0025
 
 @dataclass(frozen=True)
 class LayoutFrame:
-    """某一时刻的画面状态。``slots`` 是各行的名次位置（可为小数，即滑行中）。"""
+    """某一时刻的画面状态。``slots`` 是各行的名次位置（可为小数，即滑行中）。
+
+    ``values`` 是**显示值**——对真实累计值做过一层指数平滑，用于画条长与数值，
+    让画面平稳生长；名次（``slots`` 背后的排序）仍以真实累计值为准。
+    """
 
     moment: str
     values: list[float]
@@ -362,6 +375,8 @@ def layout(rows: Sequence[dict]) -> Iterator[LayoutFrame]:
     axis, lookup = _timeline(rows)
     count = len(rows)
     values = [0.0] * count
+    # 显示值滞后于真实值，逐帧向它逼近——这就是「平稳生长」的来源。
+    display = [0.0] * count
     order = list(range(count))
     # 初始名次即入场顺序，各就各位不做开场动画。
     slots = [float(index) for index in range(count)]
@@ -372,6 +387,8 @@ def layout(rows: Sequence[dict]) -> Iterator[LayoutFrame]:
             value = lookup[index].get(moment)
             if value is not None:
                 values[index] = value
+        for index in range(count):
+            display[index] += (values[index] - display[index]) * VALUE_GLIDE
 
         peak = max((abs(value) for value in values), default=1.0) or 1.0
         scale = peak if scale <= 0 else scale + (peak - scale) * SCALE_GLIDE
@@ -380,20 +397,22 @@ def layout(rows: Sequence[dict]) -> Iterator[LayoutFrame]:
         for rank, index in enumerate(order):
             slots[index] += (rank - slots[index]) * GLIDE
 
-        yield LayoutFrame(moment, list(values), list(slots), scale)
+        yield LayoutFrame(moment, list(display), list(slots), scale)
 
     if not axis:
         return
 
     # 数据放完后继续滑行到各就各位，再交给定格。
     # 收盘那一刻名次往往刚翻转，直接定格就会把观众唯一会认真读的一帧
-    # 停在两张卡片叠着的半路上。
+    # 停在两张卡片叠着的半路上。显示值也一并收敛到真实值。
     for _ in range(SETTLE_FRAMES):
         if max(abs(slots[index] - rank) for rank, index in enumerate(order)) < 0.01:
             break
+        for index in range(count):
+            display[index] += (values[index] - display[index]) * VALUE_GLIDE
         for rank, index in enumerate(order):
             slots[index] += (rank - slots[index]) * GLIDE
-        yield LayoutFrame(axis[-1], list(values), list(slots), scale)
+        yield LayoutFrame(axis[-1], list(display), list(slots), scale)
 
 
 def _race_frames(
@@ -632,30 +651,67 @@ def _closing_frames(bundle: MarketBundle, seconds: float) -> Iterator[Image.Imag
         yield image
 
 
+def _stitch(
+    segments: Sequence[Iterator[Image.Image]], n: int = CROSSFADE_FRAMES
+) -> Iterator[Image.Image]:
+    """把若干段帧序列首尾用交叉淡入接起来。
+
+    在前一段的最后一帧与后一段的第一帧之间插入 ``n`` 帧 ``Image.blend`` 过渡，
+    消除静止页硬切时的「顿」感。段本身原样输出，只是段与段之间多几帧溶解。
+
+    全程流式、内存恒定：只需记住前一段的末帧与后一段的首帧各一张，
+    不缓存整段——一帧就是 6MB，缓存整段会把内存吃穿。
+    """
+    last: Image.Image | None = None
+    for seg in segments:
+        it = iter(seg)
+        first = next(it, None)
+        if first is None:
+            continue
+        if last is not None:
+            for step in range(n):
+                alpha = (step + 1) / (n + 1)
+                yield Image.blend(last, first, alpha)
+        yield first
+        prev = first
+        for frame in it:
+            yield frame
+            prev = frame
+        last = prev
+
+
 def frames(bundle: MarketBundle) -> Iterator[Image.Image]:
-    """整支视频的帧序列：封面 → 板块赛跑 → 结论页。
+    """整支视频的帧序列：封面 → 板块赛跑 → 结论页，段间交叉淡入。
 
     个股不再单独走一段动态赛跑——早先那一段跟在板块后面，观众常反馈没
     注意到已经切到个股。现在把个股收进结论页的 TOP3，视频主线只剩「行业
     资金赛跑」一条，个股作为结论落点一次给全。
+
+    三段之间用 ``_stitch`` 做几帧交叉淡入：封面与结论页都是静止页，硬切上去
+    会「顿」一下，溶解过渡把它们和赛跑段连成一气。
     """
-    yield from _cover_frames(
-        bundle.indexes,
-        bundle.sector_inflow,
-        bundle.sector_outflow,
-        bundle.date_text,
-        # 封面只当个引子，很快切进赛跑——停太久开头会像卡住不动。
-        seconds=0.2,
+    return _stitch(
+        [
+            _cover_frames(
+                bundle.indexes,
+                bundle.sector_inflow,
+                bundle.sector_outflow,
+                bundle.date_text,
+                # 封面只当个引子，很快切进赛跑——停太久开头会像卡住不动。
+                seconds=0.2,
+            ),
+            _race_frames(
+                bundle.sectors,
+                "A股各板块资金流向",
+                # 不带副标题：多一行小字反而挤，标题一句已说清是什么。
+                "",
+                # 赛跑跑完只做极短定格随即切结论页：滑行收尾（SETTLE_FRAMES）
+                # 已把名次落定，观众要读的最终榜单在结论页里给全，这里不必久留。
+                hold_seconds=0.2,
+            ),
+            _closing_frames(bundle, seconds=1.0),
+        ]
     )
-    yield from _race_frames(
-        bundle.sectors,
-        "A股各板块资金流向",
-        # 不带副标题：多一行小字反而挤，标题一句已说清是什么。
-        "",
-        # 31 行需要给够读完的时间。
-        hold_seconds=2.5,
-    )
-    yield from _closing_frames(bundle, seconds=1.0)
 
 
 def build_social_title(bundle: MarketBundle) -> str:
@@ -719,7 +775,15 @@ def render(bundle: MarketBundle) -> RenderResult:
     social_title = build_social_title(bundle)
 
     # 帧工厂而不是帧列表：整段视频放不进内存，见 VideoAsset 的说明。
-    video = VideoAsset(f"market{encode.preferred_suffix()}", lambda: frames(bundle))
+    # 配音口播稿此刻就生成（走 LLM，失败退纯数据稿），BGM 到编码时按仓库/环境定位；
+    # 真正的 TTS 合成推迟到编码阶段，失败也只让这一条音轨降级，不碰画面与文案。
+    spec = audio.AudioSpec(
+        narration=narration.build_script(bundle),
+        bgm=audio.resolve_bgm(),
+    )
+    video = VideoAsset(
+        f"market{encode.preferred_suffix()}", lambda: frames(bundle), audio=spec
+    )
 
     copy_fields = [
         CopyField("标题", social_title, f"小红书标题上限 {TITLE_LIMIT} 字", rows=2),

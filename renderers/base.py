@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterator, Protocol
+from typing import TYPE_CHECKING, Callable, Iterator, Protocol
 
 from PIL import Image
 
 from core.models import Bundle
 from renderers import encode
+
+if TYPE_CHECKING:
+    from renderers.audio import AudioSpec
 
 
 @dataclass
@@ -35,14 +38,18 @@ class VideoAsset:
 
     ``save`` 返回真实写出的路径：环境里没有 ffmpeg 时会降级成 GIF，
     扩展名跟着变，调用方需要知道最终文件叫什么。
+
+    ``audio`` 给定时，成片会叠上旁白与背景音乐；合成或混音失败只是留住无声版，
+    绝不因音频而让视频出不来（详见 ``encode.write``）。
     """
 
     name: str
     frames: Callable[[], Iterator[Image.Image]]
     fps: int = encode.FPS
+    audio: "AudioSpec | None" = None
 
     def save(self, path: Path) -> Path:
-        return encode.write(self.frames(), path, self.fps)
+        return encode.write(self.frames(), path, self.fps, audio=self.audio)
 
 
 @dataclass
