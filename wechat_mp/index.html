@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>开源升温榜｜近 24 小时增长最快的 10 个 GitHub 项目 · 微信公众号成稿</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#eef0f3; color:#1a1d29;
+      font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    .toolbar { position:sticky; top:0; z-index:10; padding:12px 18px;
+      background:rgba(255,255,255,.96); border-bottom:1px solid #dde0e6; }
+    .toolbar .row { display:flex; gap:10px; align-items:center;
+      justify-content:space-between; flex-wrap:wrap; }
+    .brand { font-size:14px; font-weight:600; }
+    .brand a { color:#8b93a3; text-decoration:none; font-weight:500; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    button,.button { border:0; border-radius:7px; padding:9px 13px;
+      font:600 13px/1 sans-serif; cursor:pointer; text-decoration:none; }
+    .primary { color:#fff; background:#0f6f63; }
+    .secondary { color:#1a1d29; background:#eceef2; }
+    .ghost { color:#0f6f63; background:transparent; padding:6px 8px; }
+    .page { width:min(100%,700px); margin:22px auto 60px; padding:0 12px; }
+    .hint { margin:0 0 16px; color:#8b93a3; font-size:12px; line-height:1.8; }
+    .field-hint { margin:-2px 0 8px; color:#8b93a3; font-size:12px; line-height:1.6; }
+    .block { margin:0 0 22px; }
+    .block-head { display:flex; align-items:center; justify-content:space-between;
+      margin:0 0 10px; }
+    .block-head h2 { margin:0; font-size:13px; font-weight:600; color:#8b93a3;
+      letter-spacing:.04em; }
+    textarea { width:100%; padding:14px; border:1px solid #dde0e6; border-radius:10px;
+      background:#fff; font:400 13px/1.75 inherit; color:#1a1d29; resize:vertical; }
+    .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:12px; }
+    .shot { position:relative; margin:0; background:#fff; border:1px solid #e2e5ea;
+      border-radius:10px; overflow:hidden; }
+    .shot img { display:block; width:100%; height:auto; }
+    .seq { position:absolute; top:8px; left:8px; min-width:22px; height:22px;
+      border-radius:11px; background:#1a1d29; color:#fff; font:600 12px/22px sans-serif;
+      text-align:center; }
+    .shot figcaption { display:flex; justify-content:flex-end;
+      padding:8px 10px; font-size:12px; color:#8b93a3; }
+    .shot a { color:#0f6f63; text-decoration:none; font-weight:600; }
+    .clip { display:block; width:100%; max-height:74vh; border-radius:10px;
+      background:#000; }
+    .field-hint a { color:#0f6f63; text-decoration:none; font-weight:600; }
+    #rich { background:#f5f6f8; border-radius:10px;
+      box-shadow:0 10px 30px rgba(26,29,41,.08); }
+    #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%);
+      padding:10px 16px; border-radius:20px; background:#1a1d29; color:#fff;
+      font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s; }
+    #toast.show { opacity:1; }
+    @media (max-width:620px) {
+      .actions { width:100%; }
+      button,.button { flex:1; text-align:center; white-space:nowrap; }
+      .page { margin-top:14px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="row">
+      <div class="brand">微信公众号成稿 ·
+        <a href="../index.html">返回总览</a></div>
+      <nav class="actions" aria-label="发布操作"><button class="primary" type="button" onclick="copyRich()">复制正文（富文本）</button><a class="button secondary" href="https://mp.weixin.qq.com/" target="_blank" rel="noopener">打开公众号后台</a></nav>
+    </div>
+  </header>
+  <main class="page">
+    <p class="hint">先点「复制正文」粘贴到公众号编辑器，再上传封面。粘贴后若样式有偏差，可在编辑器里微调字号与段距。</p>
+    
+    <section class="block"><div class="block-head"><h2>标题</h2><button class="ghost" type="button" onclick="copyField('field0')">复制</button></div><p class="field-hint">公众号标题上限 64 字</p><textarea id="field0" rows="2" readonly>开源升温榜｜近 24 小时增长最快的 10 个 GitHub 项目</textarea></section>
+    <section class="block"><div class="block-head"><h2>图片素材</h2><button class="ghost" type="button" onclick="downloadAll()">全部下载</button></div><p class="field-hint">按角标顺序上传；手机端长按图片即可保存。</p><div class="gallery"><figure class="shot"><span class="seq">1</span><img src="cover.png" alt="第 1 张图卡" loading="lazy"><figcaption><a download="cover.png" href="cover.png">下载</a></figcaption></figure></div><script>const ASSETS = ["cover.png"];</script></section>
+    <section class="block"><div class="block-head"><h2>正文预览</h2></div><article id="rich"><section style="max-width:100%;padding:16px 12px;background-color:#f5f6f8;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:#3d4351;"><section style="padding:22px 16px;background-color:#1a1d29;text-align:center;"><p style="margin:0;font-size:11px;line-height:1;color:#8f97ad;letter-spacing:0.18em;">GITHUB DAILY RADAR</p><p style="margin:10px 0 0;font-size:22px;line-height:1.4;font-weight:bold;color:#ffffff;">开源升温榜</p><p style="margin:5px 0 0;font-size:15px;line-height:1.6;color:#d9dce5;">过去一天，哪些 GitHub 项目正在快速获得关注？</p><p style="margin:12px 0 0;font-size:12px;line-height:1.7;color:#9aa2b8;">2026-09-05 · 近 24h 最高 <span style="color:#0f6f63;font-weight:bold;">+2.8k</span><span style="color:#f5a623;">★</span> · Python 4 · JavaScript 2 · TypeScript 2</p></section><section style="margin:24px 0 12px;"><p style="margin:0;font-size:15px;line-height:1;font-weight:bold;color:#1a1d29;">前三观察<span style="margin-left:8px;font-size:12px;color:#8b93a3;">不止看数字，也看项目价值</span></p></section><section style="margin:0 0 14px;padding:16px;background-color:#ffffff;border:1px solid #e8eaef;"><p style="margin:0;font-size:11px;line-height:1;color:#8b93a3;letter-spacing:0.12em;">RANK 01</p><p style="margin:8px 0 0;font-size:17px;line-height:1.5;font-weight:bold;"><a href="https://github.com/mattpocock/skills" style="color:#1a1d29;text-decoration:none;">mattpocock/skills</a></p><p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#3d4351;">Skills for Real Engineers. Straight from my .age…</p><p style="margin:10px 0 0;font-size:12px;line-height:1.6;color:#8b93a3;"><span style="color:#0f6f63;font-weight:bold;">+2.8k</span><span style="color:#f5a623;">★</span><span style="color:#0f6f63;"> 近24h</span><span> · Shell</span><span> · 累计 251k</span><span style="color:#f5a623;">★</span></p><p style="margin:14px 0 0;font-size:13px;line-height:1;"><a href="https://github.com/mattpocock/skills" style="color:#0f6f63;text-decoration:none;">打开仓库 →</a></p></section><section style="margin:0 0 14px;padding:16px;background-color:#ffffff;border:1px solid #e8eaef;"><p style="margin:0;font-size:11px;line-height:1;color:#8b93a3;letter-spacing:0.12em;">RANK 02</p><p style="margin:8px 0 0;font-size:17px;line-height:1.5;font-weight:bold;"><a href="https://github.com/DietrichGebert/ponytail" style="color:#1a1d29;text-decoration:none;">DietrichGebert/ponytail</a></p><p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#3d4351;">Makes your AI agent think like the laziest senio…</p><p style="margin:10px 0 0;font-size:12px;line-height:1.6;color:#8b93a3;"><span style="color:#0f6f63;font-weight:bold;">+1.7k</span><span style="color:#f5a623;">★</span><span style="color:#0f6f63;"> 近24h</span><span> · JavaScript</span><span> · 累计 126k</span><span style="color:#f5a623;">★</span></p><p style="margin:14px 0 0;font-size:13px;line-height:1;"><a href="https://github.com/DietrichGebert/ponytail" style="color:#0f6f63;text-decoration:none;">打开仓库 →</a></p></section><section style="margin:0 0 14px;padding:16px;background-color:#ffffff;border:1px solid #e8eaef;"><p style="margin:0;font-size:11px;line-height:1;color:#8b93a3;letter-spacing:0.12em;">RANK 03</p><p style="margin:8px 0 0;font-size:17px;line-height:1.5;font-weight:bold;"><a href="https://github.com/debpalash/VoiceStudio" style="color:#1a1d29;text-decoration:none;">debpalash/VoiceStudio</a></p><p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#3d4351;">VoiceStudio is the open-source, fully-local Elev…</p><p style="margin:10px 0 0;font-size:12px;line-height:1.6;color:#8b93a3;"><span style="color:#0f6f63;font-weight:bold;">+1.3k</span><span style="color:#f5a623;">★</span><span style="color:#0f6f63;"> 近24h</span><span> · Python</span><span> · 累计 18k</span><span style="color:#f5a623;">★</span></p><p style="margin:14px 0 0;font-size:13px;line-height:1;"><a href="https://github.com/debpalash/VoiceStudio" style="color:#0f6f63;text-decoration:none;">打开仓库 →</a></p></section><section style="margin:24px 0 12px;"><p style="margin:0;font-size:15px;line-height:1;font-weight:bold;color:#1a1d29;">继续升温<span style="margin-left:8px;font-size:12px;color:#8b93a3;">第 4–10 名</span></p></section><section style="padding:4px 16px;background-color:#ffffff;border:1px solid #e8eaef;"><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">04</span> <a href="https://github.com/humanlayer/skills" style="color:#1a1d29;text-decoration:none;font-weight:bold;">humanlayer/skills</a> <span style="color:#0f6f63;font-weight:bold;">+1.1k</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">humanlayer/skills 近期新增关注</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">TypeScript · 累计 2.3k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">05</span> <a href="https://github.com/affaan-m/ECC" style="color:#1a1d29;text-decoration:none;font-weight:bold;">affaan-m/ECC</a> <span style="color:#0f6f63;font-weight:bold;">+1.1k</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">The agent harness performance optimization syste…</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">JavaScript · 累计 249k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">06</span> <a href="https://github.com/blader/humanizer" style="color:#1a1d29;text-decoration:none;font-weight:bold;">blader/humanizer</a> <span style="color:#0f6f63;font-weight:bold;">+1.1k</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">Agent skill that removes signs of AI-generated w…</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">Python · 累计 43k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">07</span> <a href="https://github.com/sgl-project/sglang" style="color:#1a1d29;text-decoration:none;font-weight:bold;">sgl-project/sglang</a> <span style="color:#0f6f63;font-weight:bold;">+836</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">SGLang is a high-performance serving framework f…</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">Python · 累计 35k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">08</span> <a href="https://github.com/stablyai/orca" style="color:#1a1d29;text-decoration:none;font-weight:bold;">stablyai/orca</a> <span style="color:#0f6f63;font-weight:bold;">+831</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">Orca is the ADE for working with a fleet of para…</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">TypeScript · 累计 62k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;border-bottom:1px solid #e8eaef;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">09</span> <a href="https://github.com/bannedbook/fanqiang" style="color:#1a1d29;text-decoration:none;font-weight:bold;">bannedbook/fanqiang</a> <span style="color:#0f6f63;font-weight:bold;">+730</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">翻墙-科学上网</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">Kotlin · 累计 53k<span style="color:#f5a623;">★</span></p></section><section style="padding:12px 0;"><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1d29;"><span style="color:#8b93a3;font-weight:bold;">10</span> <a href="https://github.com/NousResearch/hermes-agent" style="color:#1a1d29;text-decoration:none;font-weight:bold;">NousResearch/hermes-agent</a> <span style="color:#0f6f63;font-weight:bold;">+720</span><span style="color:#f5a623;">★</span></p><p style="margin:4px 0 0 26px;font-size:12px;line-height:1.6;color:#8b93a3;">The agent that grows with you</p><p style="margin:2px 0 0 26px;font-size:11px;line-height:1.5;color:#a0a6b2;">Python · 累计 242k<span style="color:#f5a623;">★</span></p></section></section><section style="margin:24px 0 4px;"><p style="margin:0;font-size:12px;line-height:1.8;color:#8b93a3;">数据来自 GitHub Trending 日榜（综合榜 + 8 个主流语言榜），按各项目的新增星标降序重排。<br>口径说明：Trending 的「stars today」是抓取时刻往前回溯约 24 小时的滚动窗口，并非自然日切片；排名取自上述候选池，未覆盖的语言榜可能有遗漏。<br><a href="https://github.com/trending?since=daily" style="color:#0f6f63;text-decoration:none;">查看源页 →</a></p></section></section></article></section>
+  </main>
+  <div id="toast" role="status" aria-live="polite">已复制</div>
+  <script>
+    function toast(message) {
+      const el = document.getElementById("toast");
+      el.textContent = message;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    async function copyRich() {
+      const article = document.getElementById("rich");
+      const wrapped = `<!DOCTYPE html><html><body>${article.innerHTML}</body></html>`;
+      try {
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([new ClipboardItem({
+            "text/html": new Blob([wrapped], {type:"text/html;charset=utf-8"}),
+            "text/plain": new Blob([article.innerText], {type:"text/plain;charset=utf-8"})
+          })]);
+        } else {
+          const range = document.createRange();
+          range.selectNodeContents(article);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          document.execCommand("copy");
+          selection.removeAllRanges();
+        }
+        toast("已复制，可粘贴到公众号编辑器");
+      } catch (error) {
+        toast("复制失败，请手动选择正文");
+      }
+    }
+    async function copyField(id) {
+      const area = document.getElementById(id);
+      try {
+        await navigator.clipboard.writeText(area.value);
+      } catch (error) {
+        area.removeAttribute("readonly");
+        area.select();
+        document.execCommand("copy");
+        area.setAttribute("readonly", "readonly");
+      }
+      toast("已复制");
+    }
+    function downloadAll() {
+      if (typeof ASSETS === "undefined") return;
+      ASSETS.forEach((name, index) => setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = name;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, index * 350));
+      toast("开始逐张下载，手机端也可长按图片保存");
+    }
+  </script>
+</body>
+</html>

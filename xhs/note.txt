@@ -1,0 +1,37 @@
+AI Agent 当道
+
+今日GitHub新榜前五里，AI Agent相关项目占了三席，工程师技能合集mattpocock/skills单日狂揽2758星登顶，懒人思维链ponytail和性能优化ECC也来势汹勐，想跟AI工具浪潮的可以收藏看看。
+
+🥇 01｜mattpocock/skills  +2.8k★
+Skills for Real Engineers. Straight from my .age…
+
+🥈 02｜DietrichGebert/ponytail  +1.7k★
+Makes your AI agent think like the laziest senio…
+
+🥉 03｜debpalash/VoiceStudio  +1.3k★
+VoiceStudio is the open-source, fully-local Elev…
+
+🔹 04｜humanlayer/skills  +1.1k★
+humanlayer/skills 近期新增关注
+
+🔹 05｜affaan-m/ECC  +1.1k★
+The agent harness performance optimization syste…
+
+🔹 06｜blader/humanizer  +1.1k★
+Agent skill that removes signs of AI-generated w…
+
+🔹 07｜sgl-project/sglang  +836★
+SGLang is a high-performance serving framework f…
+
+🔹 08｜stablyai/orca  +831★
+Orca is the ADE for working with a fleet of para…
+
+🔹 09｜bannedbook/fanqiang  +730★
+翻墙-科学上网
+
+🔹 10｜NousResearch/hermes-agent  +720★
+The agent that grows with you
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub每日榜 #开源项目 #AIAgent #TypeScript #Python #JavaScript #程序员工具 #大模型应用
