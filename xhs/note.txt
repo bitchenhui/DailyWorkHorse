@@ -1,0 +1,37 @@
+日增 2.7k 星
+
+GitHub 每日热榜前五来了👏 本期亮点：本地化语音工具日增近 3000 星冲榜首，C 语言写的 MoE 推理引擎上榜，阿里也开源了代码审查工具，挺值得一看。
+
+🥇 01｜debpalash/VoiceStudio  +2.8k★
+本地化语音处理套件，支持克隆、设计、翻译、听写与有声书生成
+
+🥈 02｜JustVugg/colibri  +2.2k★
+极简 C 写的 MoE 大模型推理引擎，专家从磁盘按需加载
+
+🥉 03｜bilawalsidhu/gods-eye-view  +1.8k★
+浏览器内可交互的实时三维地球，叠加真实开源地理情报
+
+🔹 04｜alibaba/open-code-review  +1.6k★
+阿里巴巴开源的混合式代码审查工具
+
+🔹 05｜ever-co/ever-gauzy  +1.1k★
+一体化开源企业管理平台，涵盖 ERP、CRM、HR 与项目管理
+
+🔹 06｜pacifio/atlas  +1.1k★
+面向 AI 编程代理的源码管理工具，统一追踪多代理改动
+
+🔹 07｜tonhowtf/omniget  +1.0k★
+支持千余网站资源下载的桌面应用，含课程播放器与阅读器
+
+🔹 08｜calesthio/OpenMontage  +823★
+开源智能体视频生产系统，内置上百工具与制作流程
+
+🔹 09｜asgeirtj/system_prompts_leaks  +764★
+整理多家前沿 AI 模型的系统提示词与泄露内容
+
+🔹 10｜TauricResearch/TradingAgents  +745★
+多智能体协作的 LLM 金融交易框架
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub #开源项目 #Python #C语言 #Go #TypeScript #AI工具 #开发者
