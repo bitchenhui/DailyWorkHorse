@@ -1,0 +1,37 @@
+今日榜上AI代理技能最火
+
+今日GitHub热榜被AI编码代理相关项目霸榜——Cloudflare、阿里、腾讯都来凑热闹，还顺手带了个Go写的轻量全文搜索 📚 搞Agent开发的朋友可以重点看看。
+
+🥇 01｜cloudflare/security-audit-skill  +3.0k★
+面向编码代理的多阶段安全审计技能，输出机器可读的核查结果
+
+🥈 02｜alibaba/open-code-review  +2.7k★
+阿里开源的混合架构代码评审工具，结合规则流水线与大模型评审
+
+🥉 03｜Tencent/BrowserSkill  +1.3k★
+让 AI 代理复用真实浏览器会话的命令行与扩展工具
+
+🔹 04｜affaan-m/ECC  +958★
+面向多种 AI 编码代理的性能优化与技能系统
+
+🔹 05｜asciimoo/hister  +889★
+用 Go 实现的轻量个人全文搜索引擎
+
+🔹 06｜Tencent/WeKnora  +858★
+腾讯开源的大模型知识库平台，支持文档检索与代理推理
+
+🔹 07｜mattpocock/skills  +841★
+工程师日常使用的 AI 代理技能集合
+
+🔹 08｜stablyai/orca  +831★
+用于并行调度多个编码代理的桌面与远程运行环境
+
+🔹 09｜addyosmani/agent-skills  +675★
+面向生产环境 AI 编码代理的工程化技能库
+
+🔹 10｜NationalSecurityAgency/ghidra  +572★
+美国国家安全局开源的软件逆向工程分析框架
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#AI代理 #代码评审 #开源工具 #Cloudflare #阿里 #腾讯 #Go #TypeScript
