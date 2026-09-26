@@ -1,0 +1,37 @@
+今日AI代理项目霸榜,记忆系统杀进前三🚀
+
+GitHub日榜前五基本被AI Agent承包了,从团队协作、记忆系统到谷歌新发的编排框架,信息量拉满,做Agent的别错过这期👀
+
+🥇 01｜paperclipai/paperclip  +2.1k★
+开源的智能体团队协作管理工具，支持工作场景中的代理调度与监控
+
+🥈 02｜vectorize-io/hindsight  +1.7k★
+面向智能体的可学习记忆系统，提升代理跨任务上下文保持能力
+
+🥉 03｜google/ax  +1.4k★
+Google 开源的智能体编排运行时，面向代理工作流的调度框架
+
+🔹 04｜rohitg00/ai-engineering-from-scratch  +1.2k★
+从零讲解 AI 工程实践的学习型开源教程仓库
+
+🔹 05｜dream-num/univer  +1.1k★
+面向 AI 代理的办公文档统一运行时，支持表格文档幻灯片等格式
+
+🔹 06｜hydra-db/hydradb  +1.0k★
+基于对象存储构建的高性能图数据库
+
+🔹 07｜stablyai/orca  +818★
+支持多编码代理并行运行的智能体开发桌面与远程环境
+
+🔹 08｜mattpocock/skills  +583★
+汇集真实工程师常用代理技能配置的资源集合
+
+🔹 09｜obra/superpowers  +468★
+结合工程方法论的智能体技能开发框架
+
+🔹 10｜public-apis/public-apis  +360★
+面向开发者的免费公共 API 集合清单
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#开源 #AIAgent #TypeScript #Python #Go #谷歌 #智能体编排 #大模型工程
