@@ -1,0 +1,37 @@
+AI 代理工具霸榜了
+
+今天的GitHub日榜几乎被AI代理工具承包了，从提示词、前端设计到多代理框架，每一项都在解决「让AI更靠谱干活」这件事 🐋 值得收藏慢慢看
+
+🥇 01｜DietrichGebert/ponytail  +1.4k★
+面向 AI 编程代理的提示词工具，鼓励少写代码以减少出错
+
+🥈 02｜mattpocock/skills  +955★
+工程师实战的 AI Agent 技能合集，直接来自作者的 .agents 目录
+
+🥉 03｜pbakaus/impeccable  +722★
+提升 AI 代理前端设计表现的设计规范工具集
+
+🔹 04｜Panniantong/Agent-Reach  +696★
+让 AI 代理可读取 Twitter、Reddit、YouTube 等平台内容的命令行工具
+
+🔹 05｜mvschwarz/openrig  +683★
+基于 Claude Code 等终端代理构建可持久化协作的多代理团队框架
+
+🔹 06｜pablostanley/yoinks  +623★
+从终端无广告下载主流平台视频的命令行小工具
+
+🔹 07｜NVIDIA/OpenShell  +594★
+NVIDIA 开源的安全私有自主 AI 代理运行时
+
+🔹 08｜heygen-com/hyperframes  +580★
+由 Heygen 开源,用 HTML 渲染生成视频并面向代理工作流
+
+🔹 09｜affaan-m/ECC  +578★
+面向 Claude Code 等代理工具的性能优化与技能体系
+
+🔹 10｜obra/superpowers  +556★
+结合技能框架与软件方法论的代理开发方法学
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub #AI代理 #提示词工程 #开源项目 #TypeScript #Python #前端设计 #多代理框架
