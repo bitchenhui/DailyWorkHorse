@@ -1,0 +1,37 @@
+今天榜单被Agent工具霸了，前五占了仨
+
+今日 GitHub 热门榜前五清一色跟 AI Agent 相关，逆向工程、语音克隆、代码索引全能登场。TypeScript 和 Python 项目轮番上阵，想折腾智能体的朋友可以重点看看前两名 🛠️
+
+🥇 01｜morluto/rea  +24k★
+基于智能体的通用逆向工程工具，可从应用行为下探到原生二进制分析
+
+🥈 02｜debpalash/VoiceStudio  +2.3k★
+开源本地化语音工作室，支持克隆、设计、配音与转写，覆盖六百余种语言
+
+🥉 03｜xerj-org/xerj  +1.6k★
+面向 AI 智能体的轻量数据索引用一句命令索引代码文档日志和 PDF
+
+🔹 04｜anthropics/claude-plugins-official  +1.6k★
+Anthropic 官方维护的 Claude Code 插件目录
+
+🔹 05｜mattpocock/skills  +1.4k★
+由工程师整理可直接复用的 AI 智能体技能集合
+
+🔹 06｜NationalSecurityAgency/ghidra  +1.2k★
+美国国家安全局发布的软件逆向工程框架
+
+🔹 07｜K-Dense-AI/scientific-agent-skills  +1.2k★
+将任意智能体转化为科研助手的技能库与领域数据库合集
+
+🔹 08｜stablyai/orca  +1.1k★
+集中调度多种编码智能体的桌面与远程运行平台
+
+🔹 09｜affaan-m/ECC  +1.1k★
+面向主流编码智能体的性能优化与安全增强系统
+
+🔹 10｜obra/superpowers  +973★
+强调工程纪律的智能体技能框架与软件开发方法论
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub每日榜 #AI智能体 #逆向工程 #语音克隆 #TypeScript #Python #Rust #Anthropic
