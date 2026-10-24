@@ -1,0 +1,37 @@
+安全审计技能登顶，近一天涨 2716 星
+
+这是一份 GitHub 每日榜单，聚焦近 24 小时新增星标。安全审计、技能精简和知识图谱最值得关注，前五名都被 AI 代理相关项目占据 👀
+
+🥇 01｜cloudflare/security-audit-skill  +2.7k★
+面向编码代理的多阶段安全审计技能，输出可独立验证的机器可读结果
+
+🥈 02｜DietrichGebert/ponytail  +1.6k★
+让编码代理主动减少不必要代码，以资深开发者视角精简实现
+
+🥉 03｜Graphify-Labs/graphify  +1.2k★
+将代码、文档与数据模式转换为可查询的本地知识图谱
+
+🔹 04｜NVIDIA/OpenShell  +1.1k★
+为自主人工智能代理提供安全、私密的运行时环境
+
+🔹 05｜stablyai/orca  +1.1k★
+集中运行和管理多种编码代理的跨端协作平台
+
+🔹 06｜luongnv89/claude-howto  +1.1k★
+以图解和实例讲解 Claude Code，覆盖代理开发与实用模板
+
+🔹 07｜mattpocock/skills  +967★
+汇集面向真实工程场景的代理技能与配置集合
+
+🔹 08｜php/php-src  +716★
+PHP 解释器的官方源代码仓库
+
+🔹 09｜anthropics/knowledge-work-plugins  +635★
+面向知识工作者使用的 Claude Cowork 开源插件集合
+
+🔹 10｜obra/superpowers  +563★
+将代理技能与软件开发方法论结合的实用框架
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#开源项目 #GitHub榜单 #AI智能体 #代码安全 #JavaScript #Python #Rust #TypeScript
