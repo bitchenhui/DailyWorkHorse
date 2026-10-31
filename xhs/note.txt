@@ -1,0 +1,37 @@
+Rust 设计词汇库冲上榜首
+
+这份 GitHub 日榜聚焦近 24 小时新增星标。Rust 设计词汇库登顶，智能体教育、界面评审和长期记忆项目也颇受关注，适合做 AI 编程方向的选题参考。
+
+🥇 01｜pbakaus/impeccable  +2.9k★
+面向编程智能体的设计词汇库，支持界面评审与质量改进
+
+🥈 02｜hmjz100/LinkSwift  +2.1k★
+支持八类主流网盘的文件下载地址获取工具
+
+🥉 03｜HKUDS/DeepTutor  +1.9k★
+提供持续个性化辅导体验的开源教育智能体项目
+
+🔹 04｜togg53192-cmd/jailbreaks  +1.6k★
+汇总个人使用过的越狱提示词与相关资源
+
+🔹 05｜vectorize-io/hindsight  +1.5k★
+具备持续学习能力的智能体记忆系统
+
+🔹 06｜milind-soni/OpenMausBot  +1.2k★
+开源 Grok 机器人替代方案，内置供机器人使用的虚拟机
+
+🔹 07｜elayadesign/ai-design-skills  +1.2k★
+面向人工智能设计的技能集合项目
+
+🔹 08｜Leonxlnx/taste-skill  +1.1k★
+通过艺术指导与浏览器检查提升编程智能体设计品味
+
+🔹 09｜JetBrains/thinkrail  +1.1k★
+基于 pi 的轻量级真实 IDE 氛围编程环境
+
+🔹 10｜obra/superpowers  +1.0k★
+面向智能体的技能框架与软件开发方法论
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub #开源项目 #Rust #Python #JavaScript #AI智能体 #教育科技 #智能体记忆
