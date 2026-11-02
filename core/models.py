@@ -152,6 +152,30 @@ class MarketBundle(Bundle):
         return self.stock_inflow + self.stock_outflow
 
 
+class TopicPoint(TypedDict):
+    """主题图卡里的一页观点：小标题 + 展开正文。"""
+
+    heading: str
+    body: str
+
+
+@dataclass
+class TopicBundle(Bundle):
+    """人设主题图文的领域数据：今天聊什么、按什么顺序聊、怎么收尾。
+
+    与前两条管线不同，这里没有外部数据可采集——内容本身就是按 ``persona.md``
+    的人设写出来的编辑产物，渲染层只负责排版，不做任何事实加工。
+    """
+
+    topic: str = ""          # 本期主题（手动指定的原文，或自动选题的定题）
+    hook: str = ""           # 开场导语，封面与正文都从它进入
+    points: list[TopicPoint] = field(default_factory=list)
+    closing: str = ""        # 结尾抛给读者的互动问题
+    kicker: str = ""         # 封面栏目名，取自 persona.md 的「固定栏目名」
+    disclaimer: str = ""     # 免责声明，取自 persona.md，结尾卡与正文末尾共用
+    source_note: str = ""    # 主题来源备注（手动指定 / 自动选题），进封面小字
+
+
 def as_editorial(raw: dict[str, Any]) -> Editorial:
     """把任意 dict 规整成 Editorial，缺失字段补空串。"""
     return {

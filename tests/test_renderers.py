@@ -1,10 +1,10 @@
 import unittest
 
-from renderers import article, carddeck
+from renderers import article, carddeck, topiccards
 from renderers.fonts import load_font, sanitize, text_width, wrap
 from renderers.format import fmt_count, fmt_delta
 from renderers.theme import STAR_GOLD
-from tests.fixtures import make_bundle
+from tests.fixtures import make_bundle, make_topic_bundle
 
 
 class FormatTests(unittest.TestCase):
@@ -138,6 +138,44 @@ class CardDeckRendererTests(unittest.TestCase):
         result = carddeck.render(make_bundle(3))
 
         self.assertEqual(4, len(result.images))
+
+
+class TopicCardsRendererTests(unittest.TestCase):
+    def test_cards_are_cover_one_per_point_and_closing(self) -> None:
+        bundle = make_topic_bundle()
+
+        result = topiccards.render(bundle)
+
+        self.assertEqual("xhs_topic", result.platform)
+        self.assertEqual(len(bundle.points) + 2, len(result.images))
+        self.assertEqual(
+            [f"card_{i:02d}.png" for i in range(1, len(bundle.points) + 3)],
+            [a.name for a in result.images],
+        )
+        for asset in result.images:
+            self.assertEqual((1080, 1440), asset.image.size)
+
+    def test_note_contains_topic_points_closing_and_tags(self) -> None:
+        bundle = make_topic_bundle()
+
+        note = topiccards.build_note(bundle)
+
+        self.assertTrue(note.startswith(bundle.social_title))
+        self.assertIn(bundle.topic, note)
+        for point in bundle.points:
+            self.assertIn(point["heading"], note)
+            self.assertIn(point["body"], note)
+        self.assertIn(bundle.closing, note)
+        self.assertIn("#存钱", note)
+
+    def test_title_and_tags_stay_out_of_the_body_field(self) -> None:
+        result = topiccards.render(make_topic_bundle())
+
+        fields = {item.label: item.text for item in result.copy_fields}
+        self.assertEqual(["标题", "正文", "话题标签"], list(fields))
+        self.assertEqual(make_topic_bundle().social_title, fields["标题"])
+        self.assertNotIn("#", fields["正文"])
+        self.assertNotIn(fields["标题"], fields["正文"])
 
 
 if __name__ == "__main__":

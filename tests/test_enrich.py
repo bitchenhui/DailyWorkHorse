@@ -49,7 +49,7 @@ class SocialCopyTests(unittest.TestCase):
         self.assertEqual(["今天最火的开源项目"], titles)
 
     def test_tags_drop_hash_prefix_and_duplicates(self) -> None:
-        tags = social._clean_tags(["#GitHub", "GitHub", " 开源 项目 ", ""])
+        tags = social.clean_tags(["#GitHub", "GitHub", " 开源 项目 ", ""])
 
         self.assertEqual(["GitHub", "开源项目"], tags)
 

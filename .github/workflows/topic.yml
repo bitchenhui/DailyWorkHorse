@@ -1,0 +1,26 @@
+name: Topic
+
+# 人设主题图文：手动触发时在输入框里填今天的主题（一句话即可），到点没填
+# 就走自动选题（persona.md 的选题池 + 当日 GitHub Trending 素材）。
+on:
+  schedule:
+    # UTC 12:30 = 北京时间 20:30，卡小红书晚高峰；生成后人工过一眼再发，
+    # 忙的话也可以留到第二天早上发。
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 今天的主题（一句话即可，留空则自动选题）
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      platforms: xhs_topic
+      topic: ${{ inputs.topic }}
+    secrets: inherit

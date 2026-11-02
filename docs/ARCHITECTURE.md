@@ -9,6 +9,7 @@
 |--------|------|------|
 | GitHub Trending | 长图文、图卡组 | 微信公众号、小红书 |
 | A 股主力资金流 | 1080×1920 竖屏视频 | 小红书视频笔记 |
+| 人设主题（persona.md） | 1080×1440 观点图卡组 | 小红书图文笔记 |
 
 抖音与视频号的分析保留在下文，架构已为其预留扩展点，但不在当前实现范围内。
 
@@ -58,13 +59,16 @@ FEEDS = (
          {"wechat_mp": article.render, "xhs": carddeck.render}),
     Feed("market", market.build_bundle,
          {"xhs_video": marketvideo.render}),
+    Feed("topic", topic_source.build_topic_bundle,
+         {"xhs_topic": topiccards.render}),
 )
 ```
 
 两条规则值得记住：
 
 - **`build` 延迟到确认有平台启用之后才调用**。GitHub 那路要花 LLM 额度、
-  行情那路要打三十来个行情接口，都不该为一个关掉的平台白跑。
+  行情那路要打三十来个行情接口，主题那路要读 persona.md 并整期调用大模型，
+  都不该为一个关掉的平台白跑。
 - **信息源之间相互隔离**。任一信息源抛错只跳过它自己，其余照常产出；
   只有 `SystemExit`（缺配置）会中断整轮，因为那类错误改了配置才有意义。
 
@@ -138,6 +142,8 @@ ContentBundle ──────┤
                     └─► carddeck.py  ──► 1080×1440 图卡组 + 笔记正文  → 小红书   ✓
 
 MarketBundle ───────► marketvideo.py ──► 1080×1920 MP4 + 笔记正文    → 小红书视频 ✓
+
+TopicBundle ────────► topiccards.py ──► 1080×1440 观点图卡 + 笔记    → 小红书·主题 ✓
 ```
 
 | Renderer | 产物 | 消费平台 | 状态 |
@@ -145,6 +151,15 @@ MarketBundle ───────► marketvideo.py ──► 1080×1920 MP4 + 
 | `article.py` | `article.html` `article.md` `cover.png` | 公众号 | ✓ |
 | `carddeck.py` | `card_01..06.png` `note.txt` | 小红书 | ✓ |
 | `marketvideo.py` | `market.mp4` `note.txt` | 小红书视频 | ✓ |
+| `topiccards.py` | `card_01..NN.png` `note.txt` | 小红书·主题 | ✓ |
+
+人设主题这条线与前两条的本质区别：**没有采集层**。GitHub 与行情的内容
+从数据里来，模型只做改写；主题图文的内容本身就是大模型按 `persona.md`
+的人设写的，`TopicBundle` 里全是编辑产物。因此它的质量闸门不同——榜单
+那条线 LLM 挂了有模板兜底，主题这条线挂了就直接失败进运行报告：没有人设
+口吻的兜底稿，发出去等于白发。`xhs_topic` 刻意不进 `DEFAULT_PLATFORMS`：
+它依赖 persona.md 这个「人的配置」，只在新开的 `Topic` workflow 或显式的
+`ENABLED_PLATFORMS` 下运行，既有三趟运行的行为零变化。
 
 ### 视频资产：为什么帧是工厂函数
 
@@ -311,10 +326,12 @@ core/
 sources/
   github_trending.py  ✓  抓取 + 去重 + 按日增 stars 重排
   market.py           ✓  东财板块与个股分钟级资金流 + 交易日校验
+  topic.py            ✓  人设加载、主题解析（手动/自动）、TopicBundle 组装
   base.py                Source 协议（信息源再多时引入）
 enrich/
   editorial.py    ✓  摘要 / Top3 深读 / 解析校验 / 兜底
   social.py       ✓  钩子标题 / 导语 / 话题标签，失败降级模板
+  topic.py        ✓  按人设写整期主题，解析校验，失败即失败（无兜底）
 renderers/
   base.py         ✓  Renderer 协议 + RenderResult + ImageAsset + VideoAsset
   theme.py        ✓  共用色板与字体栈
@@ -324,6 +341,7 @@ renderers/
   article.py      ✓  公众号长图文 + Markdown + 900×383 封面
   carddeck.py     ✓  小红书 1080×1440 图卡组 + 笔记正文
   marketvideo.py  ✓  行情 1080×1920 竖屏视频 + 笔记正文
+  topiccards.py   ✓  人设主题 1080×1440 观点图卡 + 笔记正文
 channels/
   base.py         ✓  Channel 协议 + DeliveryResult
   pushplus.py     ✓  T0 通知
@@ -340,6 +358,8 @@ dist/
   wechat_mp/      ✓  index.html / article.html / article.md / cover.png
   xhs/            ✓  index.html / card_01..06.png / note.txt
   xhs_video/      ✓  index.html / market.mp4 / note.txt
+  xhs_topic/      ✓  index.html / card_01..NN.png / note.txt
+persona.md        ✓  人设配置：xhs_topic 的选题与口吻依据（用户填写）
 ```
 
 ## 七、迁移路径
@@ -364,6 +384,12 @@ dist/
 6. ~~**两个信息源各自定时**~~ ✓：GitHub 留在 08:30，行情排到收盘后的 15:10。
    两个工作流调用同一个可复用的 `publish.yml`。站点改由 `gh-pages` 分支承载、
    每趟先取回再增量更新，总览页改为扫描磁盘（见上一节）。
+7. ~~**第三条管线：人设主题图文**~~ ✓：前两条是「数据在说话」，效果不佳的
+   根因是没有人格。新增 `persona.md`（人设）→ `sources/topic.py`（定题：
+   手动一句话 > 自动选题）→ `enrich/topic.py`（按人设写整期）→
+   `renderers/topiccards.py`（封面 + 观点页 + 互动收尾）的 `TopicBundle`
+   管线，平台 key `xhs_topic` 独立目录、独立 `Topic` workflow（北京 20:30，
+   手动触发可带主题输入框），不进默认平台，既有管线行为零变化。
 
 顺带修掉的既有问题：`requirements.txt` 缺少 `pillow`，而封面渲染依赖它，
 Actions 环境下会 ImportError。
@@ -416,6 +442,9 @@ Actions 环境下会 ImportError。
   这意味着即使上了 T2，「全自动」也会牺牲掉一部分分发效果。
 
   建议先跑 T1 观察一两周：如果内容本身没有受众，自动化省下的 30 秒毫无意义。
+- 主题图文管线（2026-10 新增）先跑一两周看数据：手动选题和自动选题的
+  笔记各表现如何、观点卡 3 页与 5 页的完读差异。若自动选题质量不行，
+  可以把定时触发关掉只留手动；若手动都懒得填，说明选题池要写得更细。
 - 图卡数量是否要随内容调整？当前固定「封面 + 前三详情 + 列表卡」共 6 张，
   小红书上限 18 张，若发现完读率低可考虑精简到 4 张。
 - 短视频是否要做？涉及 TTS 选型（成本）与形态验证（GitHub 日报做成口播视频

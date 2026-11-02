@@ -28,27 +28,32 @@ def sanitize(text: str) -> str:
     return " ".join(_EMOJI.sub("", text or "").split())
 
 
-def _candidates(bold: bool) -> list[str]:
+# 候选字体按优先级排列，每项是 (路径, ttc 字面索引)。
+# macOS 的冬青黑体把粗体 W6 收在同一个 ttc 的 2 号字面里；本机没有 CJK 字体时
+# 一路回落到 PIL 内置位图字体，排版断言会全盘失真——所以候选链必须覆盖三平台。
+def _candidates(bold: bool) -> list[tuple[str, int]]:
     windows = os.environ.get("WINDIR", r"C:\Windows")
     if bold:
         return [
-            str(Path(windows) / "Fonts" / "msyhbd.ttc"),
-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            (str(Path(windows) / "Fonts" / "msyhbd.ttc"), 0),
+            ("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", 0),
+            ("/System/Library/Fonts/Hiragino Sans GB.ttc", 2),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 0),
         ]
     return [
-        str(Path(windows) / "Fonts" / "msyh.ttc"),
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        (str(Path(windows) / "Fonts" / "msyh.ttc"), 0),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0),
+        ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf", 0),
+        ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 0),
     ]
 
 
 @lru_cache(maxsize=64)
 def load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    for candidate in _candidates(bold):
+    for candidate, index in _candidates(bold):
         if Path(candidate).is_file():
-            return ImageFont.truetype(candidate, size=size)
+            return ImageFont.truetype(candidate, size=size, index=index)
     return ImageFont.load_default()
 
 

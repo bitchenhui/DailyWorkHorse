@@ -40,6 +40,10 @@ PLATFORM_LABELS = {
     # 与 xhs 同一个账号，但内容形态与信息源都不同（行情视频 vs 图文日报），
     # 分成两个 key 才能各写各的产物目录、各自开关。
     "xhs_video": "小红书视频",
+    # 人设主题图文。刻意不进 DEFAULT_PLATFORMS：它依赖 persona.md 且每天多花
+    # 一次 LLM 调用，只在显式启用（topic workflow、ENABLED_PLATFORMS）时运行，
+    # 保证既有三趟运行的行为零变化。
+    "xhs_topic": "小红书·主题",
 }
 DEFAULT_PLATFORMS = ("wechat_mp", "xhs", "xhs_video")
 DEFAULT_TIER = "bundle"

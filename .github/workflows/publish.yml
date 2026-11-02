@@ -9,6 +9,11 @@ on:
         description: 传给 ENABLED_PLATFORMS 的平台列表
         required: true
         type: string
+      topic:
+        description: 今日主题（仅 xhs_topic 管线用，留空则自动选题）
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -61,6 +66,7 @@ jobs:
           LLM_API_BASE: ${{ secrets.LLM_API_BASE }}
           LLM_MODEL: ${{ secrets.LLM_MODEL }}
           ENABLED_PLATFORMS: ${{ inputs.platforms }}
+          TOPIC_OVERRIDE: ${{ inputs.topic }}
           PUBLIC_DRAFT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: python main.py
 

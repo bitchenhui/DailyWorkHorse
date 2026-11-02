@@ -1,11 +1,12 @@
 # DailyWorkHorse
 
-两个信息源各有各的定时任务，各自产出成稿并经 **PushPlus** 推一条微信通知：
+三个信息源各有各的定时任务，各自产出成稿并经 **PushPlus** 推一条微信通知：
 
 | 定时（北京时间） | 信息源 | 内容 | 去哪儿 |
 |------------------|--------|------|--------|
 | **08:00** | GitHub Trending | 近 24 小时新增 stars Top10 + 大模型中文摘要与前三深度解读 | 微信公众号长图文、小红书图卡 |
 | **15:10** | A 股主力资金流 | 25 秒竖屏视频：行业与个股的资金赛跑 | 小红书视频笔记 |
+| **20:30** | 人设主题（`persona.md`） | 每天一个主题的观点图卡：封面钩子 + 3–5 页观点 + 互动收尾 | 小红书图文笔记 |
 
 > 行情为什么排在下午：视频画的是**当日**分钟级资金流曲线，必须等 A 股 15:00
 > 收盘，卡在 15:00 整点会丢掉尾盘集合竞价。
@@ -50,6 +51,11 @@ dist/
     market.mp4        # 1080×1920 竖屏，H.264 + 配音与背景音乐
     note.txt          # 完整笔记存档
     meta.json
+  xhs_topic/
+    index.html        # 分字段复制、批量下载图卡
+    card_01..NN.png   # 1080×1440 竖版图卡（封面 + 观点页 + 互动收尾）
+    note.txt          # 完整笔记存档
+    meta.json
 ```
 
 发布流程（每项约 30 秒）：
@@ -58,6 +64,7 @@ dist/
 2. 公众号：复制标题与正文 → 粘贴到编辑器 → 上传封面 → 群发
 3. 小红书图文：按角标顺序上传 6 张图卡 → 分别复制标题、正文、话题 → 发布
 4. 小红书视频：下载 mp4 → 选「视频笔记」上传 → 复制标题、正文、话题 → 发布
+5. 小红书主题：按序号上传图卡 → 分别复制标题、正文、话题 → 发布
 
 成稿页把标题、正文、话题拆成了独立的复制按钮，对应发布后台的各个输入框，
 省得在手机上从一大段文本里选中切分。
@@ -95,6 +102,19 @@ A 股资金流视频（1080×1920，约 25 秒）：
 
 > 视频每帧都挂免责声明。观众可能从任意一帧划入，声明只放片尾等于没放。
 
+人设主题图卡（`persona.md` + 每天一个主题）：
+
+- 前两条管线是「数据在说话」，这条是「你在说话」：全部内容由大模型按
+  `persona.md` 里的人设（身份、口吻、选题池、禁区）写成
+- 卡片结构：封面大字钩子 → 3–5 页观点（每页一个小标题 + 展开）→ 深色
+  互动收尾卡（提问引导评论 + 免责声明）
+- 主题两个来源：**手动指定**（GitHub App 里触发 Topic workflow 填一句话，
+  或本地 `--topic "..."`）＞ **自动选题**（从 persona.md 的选题池 + 当日
+  GitHub Trending 素材里定切入点，并自动避开上一期发过的主题）
+- 视觉走暖色纸感，与前两条的深青、白底刻意拉开——三条管线不像同一个号发的
+- 配色、栏目名、免责声明都来自 persona.md；LLM 连续两次输出不合格就当次
+  失败并发运行报告，**没有**人设口吻的兜底稿可降级
+
 ## 一次性配置
 
 ### 1. PushPlus
@@ -116,7 +136,22 @@ A 股资金流视频（1080×1920，约 25 秒）：
 | DeepSeek | `https://api.deepseek.com` | `deepseek-chat` |
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 
-### 3. GitHub Secrets
+### 3. 人设文件 persona.md
+
+「小红书·主题」管线唯一的内容依据，仓库根目录已放好带注释的模板：
+
+1. 把 `persona.md` 里的示例换成你自己的信息：我是谁、对谁说话、口吻、
+   常聊领域与选题池、禁区
+2. 「固定栏目名」「免责声明」两节会被程序直接读取（各留一行实值，说明
+   文字删掉）；其余各节是给大模型看的人设上下文
+3. 不填这个文件，`xhs_topic` 那趟会以配置错误失败——这是故意的，没有
+   人设就没有这条管线存在的意义
+
+选题两个入口：GitHub App 里手动触发 **Topic** workflow 填一句话主题；
+或者什么都不填，到点自动从选题池 + 当日 GitHub Trending 里定题（并避开
+上一期刚发过的）。
+
+### 4. GitHub Secrets
 
 仓库 → **Settings → Secrets and variables → Actions → New repository secret**，添加：
 
@@ -150,14 +185,17 @@ A 股资金流视频（1080×1920，约 25 秒）：
 
 | Name | 说明 |
 |------|------|
-| `ENABLED_PLATFORMS` | 启用哪些平台，逗号分隔，留空为全部。可选 `wechat_mp`、`xhs`、`xhs_video`。只做公众号就填 `wechat_mp` |
+| `ENABLED_PLATFORMS` | 启用哪些平台，逗号分隔，留空为全部默认。可选 `wechat_mp`、`xhs`、`xhs_video`、`xhs_topic`。只做公众号就填 `wechat_mp` |
 
-关掉某个平台连带就跳过它背后的信息源：只填 `wechat_mp,xhs` 时不会去打行情接口。
+`xhs_topic`（人设主题图文）**不在默认全开之列**：它依赖仓库根目录的
+`persona.md` 且每天多花一次 LLM 调用，只有显式启用（`ENABLED_PLATFORMS`
+里写上，或由 Topic workflow 跑）才会运行。关掉某个平台连带就跳过它背后的
+信息源：只填 `wechat_mp,xhs` 时不会去打行情接口，也不会碰 persona.md。
 `xhs_video` 的行情数字全部直接取自接口、不经大模型改写；只有视频配音的口播稿会
 用一次大模型把当日事实说顺口，没配 `LLM_API_KEY` 时自动退回纯数据拼的兜底稿，
 不影响出片。
 
-### 4. 打开 Actions 与 Pages
+### 5. 打开 Actions 与 Pages
 
 1. 到 **Actions** 页启用工作流
 2. 手动试跑一次 **GitHub Trending**，让它建出 `gh-pages` 分支
@@ -174,10 +212,15 @@ A 股资金流视频（1080×1920，约 25 秒）：
 |--------|-------------|----------|------|
 | `GitHub Trending` | `0 0 * * *` | 08:00 | `wechat_mp,xhs` |
 | `Market Flow` | `10 7 * * *`（备 `35 7 * * *`） | 15:10（备 15:35） | `xhs_video` |
+| `Topic` | `30 12 * * *` | 20:30 | `xhs_topic` |
 
-两者都调用同一个可复用工作流 `publish.yml`，装环境、跑测试、取回站点、生成、
+三者都调用同一个可复用工作流 `publish.yml`，装环境、跑测试、取回站点、生成、
 推分支的步骤只维护一份。GitHub 调度可能延迟数分钟甚至整点跳过，`Market Flow`
-另排了 15:35 的备用触发兜底；同日两跑以同内容单提交强推，无副作用。
+另排了 15:35 的备用触发兜底；同日多跑以同内容单提交强推，无副作用。
+
+`Topic` 支持手动触发并带一个 `topic` 输入框：在 GitHub App 里点开
+**Actions → Topic → Run workflow**，把今天想聊的主题填进去即可（一句话，
+留空则自动选题）。定时触发没填主题时同样走自动选题。
 
 > 待验证：东方财富的行情接口在 GitHub 托管 runner（境外 IP）上是否可达。
 > 若被限，`Market Flow` 那趟不会产出内容，但 `GitHub Trending` 完全不受影响；
@@ -215,6 +258,14 @@ python main.py --dry-run
 start dist\xhs_video\index.html
 ```
 
+只跑人设主题那一路（需要 LLM key 与已填写的 persona.md）：
+
+```powershell
+$env:ENABLED_PLATFORMS="xhs_topic"
+python main.py --dry-run --topic "今天想聊的主题"
+start dist\xhs_topic\index.html
+```
+
 只调排版，不联网也不消耗 LLM 额度（用内置的压力测试夹具：超长仓库名、超长与超短
 摘要、缺失字段）：
 
@@ -229,16 +280,20 @@ start dist-preview\index.html
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ```
-main.py                      # CLI 入口
+main.py                      # CLI 入口（--dry-run / --topic）
 pipeline.py                  # 编排：逐信息源采集加工 → 逐平台渲染 → 逐平台投递
 core/                        # 内容模型、LLM 客户端、配置、控制台
+persona.md                   # 人设：xhs_topic 管线的内容依据（需要你填写）
 sources/github_trending.py   # 采集：抓取、去重、按日增 stars 重排
 sources/market.py            # 采集：东财板块与个股的分钟级主力资金流
+sources/topic.py             # 选题：读人设、定主题（手动/自动）、组装
 enrich/editorial.py          # LLM 中文摘要与 Top3 深度解读
 enrich/social.py             # LLM 小红书钩子标题、导语、话题标签
+enrich/topic.py              # LLM 按人设写整期主题内容
 renderers/article.py         # 公众号长图文 HTML + 900×383 封面
 renderers/carddeck.py        # 小红书 1080×1440 图卡组 + 笔记正文
 renderers/marketvideo.py     # 行情竖屏视频的帧序列与笔记文案
+renderers/topiccards.py      # 人设主题图卡组 + 笔记正文
 renderers/encode.py          # 帧序列 → MP4，缺 ffmpeg 时降级 GIF
 renderers/fonts.py           # 字体加载、中英混排折行、emoji 剥离
 renderers/theme.py           # 共用色板与字体栈
@@ -252,6 +307,7 @@ requirements.txt
   publish.yml                # 可复用：装环境 → 测试 → 取回站点 → 生成 → 推分支
   github-trending.yml        # 08:00 触发，平台 wechat_mp,xhs
   market.yml                 # 15:10 触发，平台 xhs_video
+  topic.yml                  # 20:30 触发，平台 xhs_topic，支持填今日主题
 tests/
 ```
 

@@ -26,6 +26,18 @@ FALL_SOFT = "#e6f5ee"
 # 图卡与公众号正文里的星标色。Pillow 画不出 emoji 星，用字形 ★ 着金色。
 STAR_GOLD = "#f5a623"
 
+# 人设主题图卡走暖色纸感：GitHub 是深青科技风、行情是白底财经风，三条管线
+# 摆在一起不能再像同一个号发的。暖色也更贴「个人在聊天」而非「机构在播报」
+# 的调性。
+TOPIC_BG = "#f7f1e5"
+TOPIC_SURFACE = "#fffdf7"
+TOPIC_INK = "#33291f"
+TOPIC_BODY = "#5c4f3d"
+TOPIC_MUTED = "#a4906f"
+TOPIC_ACCENT = "#c05f32"
+TOPIC_ACCENT_SOFT = "#f0ddc7"
+TOPIC_LINE = "#e6dac4"
+
 FONT = (
     "-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB',"
     "'Microsoft YaHei',sans-serif"

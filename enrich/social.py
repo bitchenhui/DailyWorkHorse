@@ -71,7 +71,7 @@ TITLE_MIN = 8
 _BREAKPOINTS = "，,。！？!?、；;"
 
 
-def _fit_title(text: str) -> str | None:
+def fit_title(text: str) -> str | None:
     """超长标题回退到最近的句子级断点，回退不了就丢弃，绝不留残句。"""
     text = " ".join(str(text).split())
     if not text:
@@ -88,13 +88,13 @@ def _fit_title(text: str) -> str | None:
 def _clean_titles(raw: object) -> list[str]:
     titles: list[str] = []
     for item in raw if isinstance(raw, list) else []:
-        text = _fit_title(item)
+        text = fit_title(item)
         if text and text not in titles:
             titles.append(text)
     return titles
 
 
-def _clean_tags(raw: object) -> list[str]:
+def clean_tags(raw: object) -> list[str]:
     tags: list[str] = []
     for item in raw if isinstance(raw, list) else []:
         text = str(item).strip().lstrip("#").strip()
@@ -141,5 +141,5 @@ def generate(
 
     titles = _clean_titles(data.get("titles")) or default.titles
     lede = " ".join(str(data.get("lede") or "").split()) or default.lede
-    tags = _clean_tags(data.get("tags")) or default.tags
+    tags = clean_tags(data.get("tags")) or default.tags
     return SocialCopy(titles=titles, lede=lede, tags=tags)

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""GitHub Trending 日榜 → LLM 解读 → 公众号与小红书成稿 → 微信通知.
+"""GitHub Trending / A股资金流 / 人设主题 → 各平台成稿 → 微信通知.
 
 入口只负责解析命令行与错误退出码，实际逻辑见 ``pipeline`` 与各分层模块。
 """
 
 from __future__ import annotations
 
+import argparse
+import os
 import sys
 import traceback
 
@@ -16,7 +18,18 @@ load_dotenv()
 
 
 def main() -> int:
-    return pipeline.run(dry_run="--dry-run" in sys.argv)
+    parser = argparse.ArgumentParser(description="每日内容分发")
+    parser.add_argument("--dry-run", action="store_true", help="跳过微信推送")
+    parser.add_argument(
+        "--topic",
+        default="",
+        help="今天想聊的主题（仅 xhs_topic 管线用）；不传则自动选题",
+    )
+    args = parser.parse_args()
+
+    if args.topic.strip():
+        os.environ["TOPIC_OVERRIDE"] = args.topic.strip()
+    return pipeline.run(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

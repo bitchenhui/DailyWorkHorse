@@ -9,6 +9,7 @@ from core.models import (
     RepoItem,
     Sector,
     Stock,
+    TopicBundle,
 )
 
 
@@ -46,6 +47,42 @@ def make_bundle(count: int = 10) -> ContentBundle:
         alt_titles=["近 24h GitHub 涨最快的项目", "备选标题二"],
         lede="每天扒一遍 GitHub Trending，两分钟看完最新的开源风向。",
         tags=["GitHub", "开源项目", "程序员"],
+    )
+
+
+def make_topic_bundle() -> TopicBundle:
+    """一期人设主题图文。观点给满 4 条，排版测试才有代表性。"""
+    return TopicBundle(
+        slug="2026-08-19-xhs-topic",
+        date_text="2026-08-19",
+        title="年轻人为什么存不下钱",
+        topic="年轻人为什么存不下钱",
+        alt_titles=["月薪过万还是月光的钱去哪了", "备选标题二"],
+        lede="聊一个我们自己每天都在经历的事。",
+        tags=["存钱", "消费观", "理财", "年轻人"],
+        hook="聊一个我们自己每天都在经历的事。",
+        points=[
+            {
+                "heading": "钱是看不见就没了的",
+                "body": "工资到账先租房再点外卖，一个月下来剩下的都是「没被花掉的」而不是「决定要存的」。没有先把存的钱划走，就永远存不下来。",
+            },
+            {
+                "heading": "小额订阅是隐形出血点",
+                "body": "视频会员、云盘、健身 App，单看每个都不贵，加起来一个月小几百。它们的特点是自动续费，你不取消它就一直扣。",
+            },
+            {
+                "heading": "情绪消费最经不起盘点",
+                "body": "加班晚了打车、烦了点奶茶、开心了下单个手办，单次都不心疼，月底一盘点占掉两成收入。这不是乱花钱，是没给情绪单独定价。",
+            },
+            {
+                "heading": "先存后花才是唯一解",
+                "body": "发薪日当天把 10% 划进另一个账户，剩下的随便花也不心虚。存钱靠的不是意志力，是把意志力从流程里删掉。",
+            },
+        ],
+        closing="你上一次成功存下钱，是因为什么？",
+        kicker="茶余饭后",
+        disclaimer="以上是我个人经验和观点，不构成任何投资建议。",
+        source_note="手动指定",
     )
 
 

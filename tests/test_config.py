@@ -21,6 +21,13 @@ class PlatformSwitchTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 config.enabled_platforms()
 
+    def test_topic_platform_is_opt_in(self) -> None:
+        """xhs_topic 依赖 persona.md 且每天多一次 LLM 调用，不许混进默认全开。"""
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertNotIn("xhs_topic", config.DEFAULT_PLATFORMS)
+        with mock.patch.dict(os.environ, {"ENABLED_PLATFORMS": "xhs_topic"}, clear=True):
+            self.assertEqual(("xhs_topic",), config.enabled_platforms())
+
     def test_tier_defaults_to_bundle_and_reads_env(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual("bundle", config.platform_tier("xhs"))

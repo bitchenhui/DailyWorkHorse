@@ -19,7 +19,7 @@ from pathlib import Path
 from channels.bundle import BundleChannel
 from channels.overview import write_overview
 from core.models import ContentBundle
-from renderers import article, carddeck, marketvideo
+from renderers import article, carddeck, marketvideo, topiccards
 
 _LONG_SUMMARY = (
     "一个用于压力测试排版的超长中文摘要，包含 English words 与 1234 数字，"
@@ -87,6 +87,15 @@ def main() -> int:
         result = render(bundle)
         delivered = channel.deliver(bundle, result)
         print(f"  {result.platform_label}: {delivered.detail}")
+
+    # 主题图卡的夹具同样住在 tests 里（4 条观点的代表性数据），渲染很快，
+    # 和图卡组一样默认就出，方便把三条管线的版式放在一起对照。
+    from tests.fixtures import make_topic_bundle
+
+    topic_bundle = make_topic_bundle()
+    result = topiccards.render(topic_bundle)
+    delivered = channel.deliver(topic_bundle, result)
+    print(f"  {result.platform_label}: {delivered.detail}")
 
     if with_video:
         # 行情夹具住在 tests 里：它同样是一份刻意设计的边界数据

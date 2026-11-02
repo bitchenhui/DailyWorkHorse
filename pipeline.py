@@ -23,10 +23,11 @@ from core.console import safe_print
 from core.models import Bundle, ContentBundle, NothingToPublish
 from enrich import editorial as editorial_enricher
 from enrich import social as social_enricher
-from renderers import article, carddeck, marketvideo
+from renderers import article, carddeck, marketvideo, topiccards
 from renderers.base import RenderResult
 from renderers.theme import ACCENT, ACCENT_SOFT, FONT
 from sources import github_trending, market
+from sources import topic as topic_source
 
 
 def build_content_bundle(limit: int = 10) -> ContentBundle:
@@ -76,6 +77,9 @@ FEEDS: tuple[Feed, ...] = (
         {"wechat_mp": article.render, "xhs": carddeck.render},
     ),
     Feed("market", market.build_bundle, {"xhs_video": marketvideo.render}),
+    # 人设主题图文：xhs_topic 独立于 xhs，同一个账号、不同的产物目录，
+    # 两趟运行互不覆盖。build 惰性，平台不开就不会去读 persona.md、花 LLM 额度。
+    Feed("topic", topic_source.build_topic_bundle, {"xhs_topic": topiccards.render}),
 )
 
 
