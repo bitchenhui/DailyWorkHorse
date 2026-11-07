@@ -1,0 +1,37 @@
+Cloudflare 安全审计技能登顶
+
+这份 GitHub 日榜聚焦近 24 小时新增星标，前五里 Python 项目占三席。Cloudflare 的编码代理安全审计技能登顶，工程技能集、语义图谱和网页抓取也很值得关注 🐍
+
+🥇 01｜cloudflare/security-audit-skill  +2.5k★
+面向编码代理的多阶段安全审计技能，可输出独立验证的机器可读结论
+
+🥈 02｜mattpocock/skills  +2.1k★
+源自作者代理目录的工程技能集合，供真实开发任务直接复用
+
+🥉 03｜NVIDIA/auto-ontology  +2.0k★
+构建数据语义图谱推理层的 Python 框架，支持确定性查询与上下文检索
+
+🔹 04｜sherlock-project/sherlock  +1.8k★
+按用户名跨社交网络查找相关账号的开源 OSINT 工具
+
+🔹 05｜D4Vinci/Scrapling  +1.3k★
+覆盖单次请求到大规模爬取的 Python 网页抓取框架
+
+🔹 06｜stablyai/orca  +1.2k★
+可在桌面、移动端和远程环境运行自有多实例编码代理集群
+
+🔹 07｜microsoft/VibeVoice  +1.0k★
+微软开源的前沿语音 AI 项目，聚焦语音模型能力建设
+
+🔹 08｜floci-io/floci  +738★
+轻量免费的 AWS 本地模拟器，为云服务开发提供本地替代
+
+🔹 09｜obra/superpowers  +629★
+结合代理技能框架与软件开发方法论的实用代理工程方案
+
+🔹 10｜vercel-labs/agent-browser  +622★
+面向 AI 代理的 Rust 浏览器自动化命令行工具
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#GitHub每日榜单 #开源项目 #Python #JavaScript #Shell #AI代理 #安全审计 #OSINT
