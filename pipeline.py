@@ -191,8 +191,8 @@ def run(dry_run: bool = False) -> int:
     outcome = distribute()
     results = outcome.results
 
-    # 先落运行记录再判成败。收尾邮件在失败时也要发，而「哪个信息源没出内容、
-    # 为什么」正是那封邮件唯一有价值的部分；写在 raise 之后就永远写不到。
+    # 先落运行记录再判成败。收尾推送在失败时也要发，而「哪个信息源没出内容、
+    # 为什么」正是那条推送唯一有价值的部分；写在 raise 之后就永远写不到。
     report.write_record(
         DIST_DIR,
         outcome.date_text,

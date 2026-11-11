@@ -162,24 +162,17 @@ A 股资金流视频（1080×1920，约 25 秒）：
 | `LLM_API_BASE` | API Base URL（不要末尾多余路径以外的 `/chat/completions`） |
 | `LLM_MODEL` | 模型名 |
 
-想让每趟 Actions 跑完发一封邮件通知（附各平台成稿链接），再加：
+想让每趟 Actions 跑完往 iPhone 推一条 **Bark** 通知（成功/失败/空跑都会发，
+点开直达分发总览或运行日志），再加：
 
 | Name | 说明 |
 |------|------|
-| `MAIL_USERNAME` | 完整邮箱地址，如 `yourname@163.com` |
-| `MAIL_PASSWORD` | **授权码**，不是登录密码（163：设置 → POP3/SMTP/IMAP → 开启 SMTP） |
-| `MAIL_TO` | 收件地址，多个用逗号分隔 |
-| `MAIL_FROM` | 可选，默认与 `MAIL_USERNAME` 相同。163 要求发件地址与登录账号一致 |
+| `BARK_URL` | Bark 推送地址，形如 `https://api.day.app/<设备key>`。iPhone 安装 Bark App 后，把首页复制的完整地址原样填入 |
 
-工作流默认连 `smtp.163.com:465` 并开启 SSL。不要用 `MAIL_CONNECTION` 那种
-`smtp://…:465` 写法——465 是隐式 SSL，那种 URL 不会握手，会报
-`Unexpected socket close`。
-
-不配邮件相关的 secret 就不发信，成稿照常发布。发信步骤失败也不会把整趟标红。
-
-> 若改完仍发不出：163 有时会拒绝 GitHub Actions 境外 IP 的 SMTP 连接。
-> 可换 QQ 邮箱（改 workflow 里 `server_address` 为 `smtp.qq.com`），或改用 Gmail
-> 应用专用密码。
+推送文案按运行结果适配：成稿就绪 → 常规级别，点开直达分发总览；今天没得发
+（周末行情）→ passive 不亮屏；运行失败 → timeSensitive，可穿透专注模式，
+点开直达运行日志。不配 `BARK_URL` 就不推送，成稿照常发布，推送步骤失败也
+不会把整趟标红。
 
 可选的仓库 **Variables**（Settings → Secrets and variables → Actions → Variables）：
 

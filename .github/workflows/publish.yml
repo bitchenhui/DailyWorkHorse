@@ -102,44 +102,15 @@ jobs:
             "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:gh-pages
           echo "站点内容：$(ls | tr '\n' ' ')"
 
-      # 跑挂了才最需要收到信，所以整段都挂 always()。
-      # 先垫一份兜底正文再让 Python 覆盖：装依赖或采集阶段就断掉时，
-      # tools.mailreport 自己也跑不起来，兜底那份得留住。
-      - name: Compose the run report
-        id: report
+      # 跑挂了才最需要收到推送，所以整段都挂 always()。
+      # tools/bark 只依赖标准库：装依赖或测试阶段就断掉时它也推得出去，
+      # 那恰恰是最需要被通知的一次运行。Bark 的 url 点开直达分发总览
+      # （有成稿时）或运行日志（失败时）。
+      - name: Notify via Bark
         if: always()
         continue-on-error: true
         env:
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
+          BARK_URL: ${{ secrets.BARK_URL }}
           PUBLIC_DRAFT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          echo "<p>本次运行没能生成报告，请直接看运行日志。</p>" > run-report.html
-          # 163 的 465 端口是隐式 SSL（SMTPS），connection_url 里的 smtp://
-          # 不会走 SSL，服务器会直接断连（Unexpected socket close）。所以拆成
-          # 显式 server/port/secure/username/password，见下方 Send 步骤。
-          if [ -n "${MAIL_USERNAME}" ] && [ -n "${MAIL_PASSWORD}" ] && [ -n "${MAIL_TO}" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "未配置 MAIL_USERNAME / MAIL_PASSWORD / MAIL_TO，跳过邮件通知"
-          fi
-          python -m tools.mailreport
-
-      - name: Send the run report
-        if: always() && steps.report.outputs.configured == 'true'
-        # 成稿已经推上 gh-pages 了，邮件只是通知——发不出去不该把整趟标红。
-        continue-on-error: true
-        uses: dawidd6/action-send-mail@v18
-        with:
-          server_address: smtp.163.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          from: DailyWorkHorse <${{ secrets.MAIL_FROM || secrets.MAIL_USERNAME }}>
-          to: ${{ secrets.MAIL_TO }}
-          subject: ${{ steps.report.outputs.subject || format('DailyWorkHorse · {0} 运行报告', inputs.platforms) }}
-          html_body: file://run-report.html
-          ignore_cert: true
+        run: python3 -m tools.bark
