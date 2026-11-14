@@ -1,0 +1,37 @@
+智能体相关项目霸榜前五
+
+这份榜单近 24 小时新增星标前五，几乎都被智能体相关项目占据。Web 开发规范、个人财务管理、工程技能与网页品味都在升温，值得一起看看。
+
+🥇 01｜GoogleChrome/modern-web-guidance-src  +1.9k★
+为编程智能体持续同步最新 Web 开发规范
+
+🥈 02｜we-promise/sure  +925★
+面向个人与共同参与者的开源个人财务管理应用
+
+🥉 03｜mattpocock/skills  +898★
+源自作者智能体目录的真实工程技能集合
+
+🔹 04｜Leonxlnx/taste-skill  +795★
+通过艺术指导与浏览器检查提升智能体网页品味
+
+🔹 05｜Alishahryar1/free-claude-code  +787★
+跨多种智能体与模型提供免费额度和浏览器会话
+
+🔹 06｜openai/codex-security  +751★
+用于发现验证并修复安全漏洞的 Codex 安全工具
+
+🔹 07｜CopilotKit/OpenBot  +674★
+为任意 AG-UI 智能体提供独立浏览器文件工具环境
+
+🔹 08｜DietrichGebert/ponytail  +600★
+以资深开发者思维约束智能体减少无效代码
+
+🔹 09｜addyosmani/agent-skills  +591★
+面向 AI 编程智能体的生产级工程技能库
+
+🔹 10｜affaan-m/ECC  +559★
+覆盖技能记忆安全与研究流程的智能体优化系统
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#智能体 #GitHub #开源项目 #TypeScript #Python #Ruby #JavaScript #Web开发

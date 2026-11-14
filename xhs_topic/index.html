@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>给 Agent 配一台电脑 · 小红书·主题成稿</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin:0; background:#eef0f3; color:#1a1d29;
+      font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    .toolbar { position:sticky; top:0; z-index:10; padding:12px 18px;
+      background:rgba(255,255,255,.96); border-bottom:1px solid #dde0e6; }
+    .toolbar .row { display:flex; gap:10px; align-items:center;
+      justify-content:space-between; flex-wrap:wrap; }
+    .brand { font-size:14px; font-weight:600; }
+    .brand a { color:#8b93a3; text-decoration:none; font-weight:500; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    button,.button { border:0; border-radius:7px; padding:9px 13px;
+      font:600 13px/1 sans-serif; cursor:pointer; text-decoration:none; }
+    .primary { color:#fff; background:#0f6f63; }
+    .secondary { color:#1a1d29; background:#eceef2; }
+    .ghost { color:#0f6f63; background:transparent; padding:6px 8px; }
+    .page { width:min(100%,700px); margin:22px auto 60px; padding:0 12px; }
+    .hint { margin:0 0 16px; color:#8b93a3; font-size:12px; line-height:1.8; }
+    .field-hint { margin:-2px 0 8px; color:#8b93a3; font-size:12px; line-height:1.6; }
+    .block { margin:0 0 22px; }
+    .block-head { display:flex; align-items:center; justify-content:space-between;
+      margin:0 0 10px; }
+    .block-head h2 { margin:0; font-size:13px; font-weight:600; color:#8b93a3;
+      letter-spacing:.04em; }
+    textarea { width:100%; padding:14px; border:1px solid #dde0e6; border-radius:10px;
+      background:#fff; font:400 13px/1.75 inherit; color:#1a1d29; resize:vertical; }
+    .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:12px; }
+    .shot { position:relative; margin:0; background:#fff; border:1px solid #e2e5ea;
+      border-radius:10px; overflow:hidden; }
+    .shot img { display:block; width:100%; height:auto; }
+    .seq { position:absolute; top:8px; left:8px; min-width:22px; height:22px;
+      border-radius:11px; background:#1a1d29; color:#fff; font:600 12px/22px sans-serif;
+      text-align:center; }
+    .shot figcaption { display:flex; justify-content:flex-end;
+      padding:8px 10px; font-size:12px; color:#8b93a3; }
+    .shot a { color:#0f6f63; text-decoration:none; font-weight:600; }
+    .clip { display:block; width:100%; max-height:74vh; border-radius:10px;
+      background:#000; }
+    .field-hint a { color:#0f6f63; text-decoration:none; font-weight:600; }
+    #rich { background:#f5f6f8; border-radius:10px;
+      box-shadow:0 10px 30px rgba(26,29,41,.08); }
+    #toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%);
+      padding:10px 16px; border-radius:20px; background:#1a1d29; color:#fff;
+      font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s; }
+    #toast.show { opacity:1; }
+    @media (max-width:620px) {
+      .actions { width:100%; }
+      button,.button { flex:1; text-align:center; white-space:nowrap; }
+      .page { margin-top:14px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <div class="row">
+      <div class="brand">小红书·主题成稿 ·
+        <a href="../index.html">返回总览</a></div>
+      <nav class="actions" aria-label="发布操作"><a class="button secondary" href="https://creator.xiaohongshu.com/publish/publish" target="_blank" rel="noopener">打开小红书创作服务平台</a></nav>
+    </div>
+  </header>
+  <main class="page">
+    <p class="hint">共 6 张图卡，按序号顺序上传，第 1 张即封面。<br>备选标题：编码 Agent 上工前</p>
+    
+    <section class="block"><div class="block-head"><h2>标题</h2><button class="ghost" type="button" onclick="copyField('field0')">复制</button></div><p class="field-hint">小红书标题上限 20 字</p><textarea id="field0" rows="2" readonly>给 Agent 配一台电脑</textarea></section><section class="block"><div class="block-head"><h2>正文</h2><button class="ghost" type="button" onclick="copyField('field1')">复制</button></div><textarea id="field1" rows="14" readonly>现在不少编码 Agent 能自己开浏览器、读文件、调工具，听起来离“独立同事”只差一步。但团队真正敢放手的前提，往往不是它更聪明，而是每一步都能解释。
+
+把编码 Agent 升级成“有记录的实习生”，团队才敢真的用它干活
+
+01｜先看记录，再看结果
+让 Agent 打开一个仓库、改几处代码不算难，难的是团队事后知道它为什么这么改。可以要求它先展示计划，再执行操作，并保留关键命令、文件变更和验证结果。这样出问题时，复盘的是流程，不是猜谜。
+
+02｜权限要比能力更保守
+Agent 有浏览器、文件系统和工具调用能力，并不等于应该一次拿到所有权限。先让它只读，再允许在临时目录写入，最后才开放真实环境。尤其是会发请求、改配置或删除文件的动作，最好加确认步骤。能回滚，比跑得快更重要。
+
+03｜结果必须能被验证
+“代码写完了”只是过程描述，不是完成标准。可以让 Agent 配套跑测试、静态检查或最小复现，并把命令与输出一起留下。涉及音视频这类对指标敏感的任务，还可以把延迟、清晰度和资源占用纳入验收，避免凭感觉宣布成功。
+
+04｜把经验写成可复用技能
+如果团队每次都要重新教 Agent 怎么查日志、定位问题、提交改动，不如把这些步骤整理成固定技能：输入是什么、先看哪些文件、允许执行什么命令、交付格式是什么。成熟的做法不是每次靠临场提示，而是把团队习惯变成可重复执行的流程。
+
+💬 如果给编码 Agent 配一台电脑，你会先开放浏览器、文件系统，还是代码提交权限？</textarea></section><section class="block"><div class="block-head"><h2>话题标签</h2><button class="ghost" type="button" onclick="copyField('field2')">复制</button></div><p class="field-hint">粘贴过去只是普通文字；想进话题页得在正文末尾逐个敲 # 再从下拉里选。</p><textarea id="field2" rows="2" readonly>#编码Agent #AI工具 #程序员成长 #软件工程 #团队协作 #开发效率 #AI工作流 #浏览器Agent</textarea></section>
+    <section class="block"><div class="block-head"><h2>图片素材</h2><button class="ghost" type="button" onclick="downloadAll()">全部下载</button></div><p class="field-hint">按角标顺序上传；手机端长按图片即可保存。</p><div class="gallery"><figure class="shot"><span class="seq">1</span><img src="card_01.png" alt="第 1 张图卡" loading="lazy"><figcaption><a download="card_01.png" href="card_01.png">下载</a></figcaption></figure><figure class="shot"><span class="seq">2</span><img src="card_02.png" alt="第 2 张图卡" loading="lazy"><figcaption><a download="card_02.png" href="card_02.png">下载</a></figcaption></figure><figure class="shot"><span class="seq">3</span><img src="card_03.png" alt="第 3 张图卡" loading="lazy"><figcaption><a download="card_03.png" href="card_03.png">下载</a></figcaption></figure><figure class="shot"><span class="seq">4</span><img src="card_04.png" alt="第 4 张图卡" loading="lazy"><figcaption><a download="card_04.png" href="card_04.png">下载</a></figcaption></figure><figure class="shot"><span class="seq">5</span><img src="card_05.png" alt="第 5 张图卡" loading="lazy"><figcaption><a download="card_05.png" href="card_05.png">下载</a></figcaption></figure><figure class="shot"><span class="seq">6</span><img src="card_06.png" alt="第 6 张图卡" loading="lazy"><figcaption><a download="card_06.png" href="card_06.png">下载</a></figcaption></figure></div><script>const ASSETS = ["card_01.png", "card_02.png", "card_03.png", "card_04.png", "card_05.png", "card_06.png"];</script></section>
+    
+  </main>
+  <div id="toast" role="status" aria-live="polite">已复制</div>
+  <script>
+    function toast(message) {
+      const el = document.getElementById("toast");
+      el.textContent = message;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    async function copyRich() {
+      const article = document.getElementById("rich");
+      const wrapped = `<!DOCTYPE html><html><body>${article.innerHTML}</body></html>`;
+      try {
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          await navigator.clipboard.write([new ClipboardItem({
+            "text/html": new Blob([wrapped], {type:"text/html;charset=utf-8"}),
+            "text/plain": new Blob([article.innerText], {type:"text/plain;charset=utf-8"})
+          })]);
+        } else {
+          const range = document.createRange();
+          range.selectNodeContents(article);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          document.execCommand("copy");
+          selection.removeAllRanges();
+        }
+        toast("已复制，可粘贴到公众号编辑器");
+      } catch (error) {
+        toast("复制失败，请手动选择正文");
+      }
+    }
+    async function copyField(id) {
+      const area = document.getElementById(id);
+      try {
+        await navigator.clipboard.writeText(area.value);
+      } catch (error) {
+        area.removeAttribute("readonly");
+        area.select();
+        document.execCommand("copy");
+        area.setAttribute("readonly", "readonly");
+      }
+      toast("已复制");
+    }
+    function downloadAll() {
+      if (typeof ASSETS === "undefined") return;
+      ASSETS.forEach((name, index) => setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = name;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }, index * 350));
+      toast("开始逐张下载，手机端也可长按图片保存");
+    }
+  </script>
+</body>
+</html>
