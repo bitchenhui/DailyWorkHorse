@@ -1,0 +1,37 @@
+Claude 漏洞测试项目登顶
+
+这是近 24 小时 GitHub 星标增长前五榜单。AI 智能体与安全工具占据前两名，下载、网页抓取和 PS5 移植也值得留意。
+
+🥇 01｜elementalsouls/Claude-BugHunter  +1.6k★
+面向 Claude Code 的漏洞发现与外部红队测试技能包
+
+🥈 02｜obra/superpowers  +922★
+将代理技能与软件开发方法论结合的智能体框架
+
+🥉 03｜XiaoYouChR/Ghost-Downloader-3  +836★
+功能集成的桌面下载器开源项目
+
+🔹 04｜firecrawl/firecrawl  +822★
+为智能体统一接入搜索抓取与多源数据的基础设施
+
+🔹 05｜boykopovar/AnyPS5  +753★
+自动将 PS5 可执行文件移植至 Linux 与 Windows
+
+🔹 06｜cathrynlavery/diagram-design  +725★
+为多种编程助手生成编辑级图表的设计工具
+
+🔹 07｜zhouxiaoka/autoclip  +718★
+本地优先的开源 AI 长视频自动剪辑桌面工具
+
+🔹 08｜DietrichGebert/ponytail  +713★
+引导智能体采用资深开发者审慎取舍的编码技能
+
+🔹 09｜mattpocock/skills  +706★
+面向真实工程场景的开源智能体技能集合
+
+🔹 10｜mvanhorn/last30days-skill  +675★
+跨多平台检索并综合近期议题的智能体技能
+
+📊 数据来自 GitHub Trending 日榜，按近 24 小时新增 Star 排序，每天更新。
+
+#开源项目 #Python #TypeScript #Shell #C++ #AI智能体 #网络安全 #PS5移植
